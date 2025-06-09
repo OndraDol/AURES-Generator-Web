@@ -1,12 +1,11 @@
 <!DOCTYPE html><html lang="cs">
 <head>
   <meta charset="utf-8">
-  <!-- Verze: 1.0.3 -->
-  <meta name="version" content="1.0.3">
+  <!-- Verze: 1.0.4 -->
   <title>AURES Generátor LP</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
+    body{font-family:Arial,Helvetica,sans-serif;background:#ffffff;margin:0;padding:20px;color:#222}
     h1{font-size:26px;margin-bottom:20px;color:#0096FF}
     h3{margin-top:30px;color:#0096FF}
     .row{display:flex;gap:12px;margin-bottom:12px;align-items:center}
@@ -27,8 +26,7 @@
 </head>
 <body>
   <h1>AURES Generátor LP</h1>
-    <!-- Viditelná verze -->
-    <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.3</p>  <div id="dropZone">
+  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.4</p>  <div id="dropZone">
     Přetáhni PDF sem nebo klikni
     <input type="file" id="fileInput" accept="application/pdf" hidden>
   </div>  <div class="row"><label>Jméno</label><input id="jmeno"></div>
@@ -50,6 +48,7 @@
       $('status').style.color = err ? '#b00' : '#006400';
     };
 
+    // data pro dropdowny
     const FACTOR = [
       "Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
       "Chemické látky a směsi","------------------","Biologické činitele",
@@ -75,4 +74,92 @@
     const POS_DESC = {
       "Call Centrum": "Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
       "Manažer/Zástupce manažera": "Vedení týmu, administrativa, řízení služebního auta.",
-'t
+      "Prodejce": "Jednání s klienty, PC, řízení auta, částečně venku.",
+      "Nákupčí / Testovací technik": "Administrativa + testování vozů, řízení auta.",
+      "Výpomoc při přípravě vozů k prodeji": "Mytí a čištění vozů venku. Bez řízení auta.",
+      "Mechanik": "Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
+      "Uklízečka": "Úklid areálu.",
+      "Stock kontrolor": "Kontrola vozového parku, převoz vozů v areálu.",
+      "Řidič do 7,5t/ Kurýr": "Přeprava zákazníků a vozidel.",
+      "Řidič nad 7,5t": "Přeprava vozů mezi pobočkami"
+    };
+
+    function fill(sel, arr) {
+      sel.innerHTML = '';
+      arr.forEach(v => sel.add(new Option(v, v)));
+    }
+    fill($('pobocka'), BRANCH);
+    fill($('konzultant'), CONSULT);
+    fill($('pozice_popis'), Object.keys(POS_DESC));
+
+    for (let i = 1; i <= 6; i++) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const sf = document.createElement('select');
+      const sk = document.createElement('select');
+      sf.id = 'faktor' + i;
+      sk.id = 'kategorie' + i;
+      fill(sf, FACTOR);
+      fill(sk, CAT);
+      if (i === 1) {
+        sf.value = "Vyšetření v základním rozsahu";
+        sk.value = "Kat. 1";
+      }
+      row.append(sf, sk);
+      $('factors').append(row);
+    }
+
+    const dz = $('dropZone'), fi = $('fileInput');
+    dz.addEventListener('click', () => fi.click());
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev,()=>dz.classList.remove('drag')));
+    dz.addEventListener('drop', e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
+    fi.addEventListener('change', e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
+
+    async function loadPDF(file) {
+      msg('Čtu PDF…');
+      $('genDocx').disabled = true;
+      try {
+        const data = new Uint8Array(await file.arrayBuffer());
+        const pdf = await pdfjsLib.getDocument({data}).promise;
+        const page = await pdf.getPage(1);
+        const ann = await page.getAnnotations({intent:'display'});
+        const get = name => ann.find(a=>a.fieldName?.trim()===name)?.fieldValue||'';
+        $('jmeno').value = get('jmeno');
+        $('narozeni').value = (get('narozeni')||'').split('/')[0].trim();
+        $('adresa').value = [get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+        $('psc').value = get('trvale-bydliste-psc');
+        msg('PDF načteno');
+        $('genDocx').disabled = false;
+      } catch (e) { console.error(e); msg('Chyba při čtení PDF', true); }
+    }
+
+    let tplBuf = null;
+    fetch(`LP_template.docx?cb=${Date.now()}`)
+      .then(r=>r.ok?r.arrayBuffer():Promise.reject())
+      .then(b=>{tplBuf=b; msg('Šablona načtena');})
+      .catch(()=>msg('Šablonu nelze načíst', true));
+
+    $('genDocx').addEventListener('click', ()=>{
+      try {
+        if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
+        msg('Generuji…');
+        const zip=new PizZip(tplBuf);
+        const doc=new window.Docxtemplater().loadZip(zip);
+        const data={jmeno:$('jmeno').value,narozeni:$('narozeni').value,adresa:$('adresa').value,psc:$('psc').value,pobocka:$('pobocka').value,pozice:$('pozice').value,konzultant:$('konzultant').value,pozice_popis:$('pozice_popis').value,popis_pozice:POS_DESC[$('pozice_popis').value]||'',datum:new Date().toLocaleDateString('cs-CZ')};
+        for(let i=1;i<=6;i++){data['faktor'+i]=$('faktor'+i).value;data['kategorie'+i]=$('kategorie'+i).value;}
+        doc.setData(data);
+        doc.render();
+        const out=doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+        console.log('Generated blob', out);
+        saveAs(out, `LP_${(data.jmeno.split(' ').pop()||'posudek')}.docx`);
+        msg('Hotovo – soubor stažen');
+      } catch(err) {
+        console.error('Generation error:', err);
+        msg('Chyba: '+err.message, true);
+        alert('Chyba při generování: '+err.message);
+      }
+    });
+  });
+  </script></body>
+</html>

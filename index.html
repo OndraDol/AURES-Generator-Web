@@ -19,87 +19,135 @@
  #status{margin-top:12px;font-size:14px;min-height:18px}
 </style>
 
-<!-- jediný balík = docxtemplater + PizZip -->
-<script src="https://unpkg.com/docxtemplater@3.29.0/build/docxtemplater.pizzip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/file-saver/2.0.5/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+<!-- externí knihovny -->
+<script defer src="https://unpkg.com/docxtemplater@3.29.0/build/docxtemplater.pizzip.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/file-saver/2.0.5/FileSaver.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        crossorigin="anonymous"></script>
 </head>
-<body>
 
+<body>
 <h1>AURES Generátor LP</h1>
 
-<div id="drop">Přetáhni PDF nebo klikni<input type="file" id="file" accept="application/pdf" hidden></div>
+<div id="drop">
+  Přetáhni PDF nebo klikni
+  <input type="file" id="file" accept="application/pdf" hidden>
+</div>
 
 <div class="row"><label>Jméno</label><input id="jmeno"></div>
 <div class="row"><label>Datum narození</label><input id="narozeni"></div>
 <div class="row"><label>Adresa</label><input id="adresa"></div>
 <div class="row"><label>PSČ</label><input id="psc"></div>
 
-<div class="row"><label>Pobočka</label><select id="pobocka">
-  <option>Praha</option><option>Brno</option><option>Ostrava</option></select></div>
+<h3>Faktory (1 – 6)</h3>
+<div id="factors"></div>
+
+<div class="row"><label>Pobočka</label>
+  <select id="pobocka">
+    <option>Praha</option><option>Brno</option><option>Ostrava</option>
+  </select>
+</div>
 <div class="row"><label>Pozice</label><input id="pozice" value="Prodejce"></div>
-<div class="row"><label>Konzultant</label><select id="konzultant">
-  <option>Jan Novák</option><option>Petra Dvořáková</option></select></div>
+<div class="row"><label>Konzultant</label>
+  <select id="konzultant">
+    <option>Jan Novák</option><option>Petra Dvořáková</option>
+  </select>
+</div>
 
 <div class="row"><button id="gen" disabled>Generovat DOCX</button></div>
 <p id="status"></p>
 
+<!-- === vlastní skript až po DOM === -->
 <script>
-/* ====== helpers ====== */
-const $=id=>document.getElementById(id);
-const setStatus=(t,err=false)=>{$('status').textContent=t;$('status').style.color=err?'#b00':'#006400';};
+/* ---------- prvky ---------- */
+const qs=id=>document.getElementById(id);
+const statusEl = qs('status');
 
-/* ====== drag & click ====== */
-$('drop').addEventListener('click',()=>$('file').click());
-['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{
-  e.preventDefault();$('drop').classList.add('drag');}));
-['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,()=>$('drop').classList.remove('drag')));
-$('drop').addEventListener('drop',e=>{
-  e.preventDefault();if(e.dataTransfer.files[0]) loadPDF(e.dataTransfer.files[0]);});
-$('file').addEventListener('change',e=>{if(e.target.files[0]) loadPDF(e.target.files[0]);});
-
-/* ====== načtení PDF ====== */
-async function loadPDF(file){
-  if(file.type!=='application/pdf'){setStatus('Není PDF',true);return;}
-  setStatus('Čtu PDF…');$('gen').disabled=true;
-  try{
-    const bytes=new Uint8Array(await file.arrayBuffer());
-    const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
-    const ann=(await pdf.getPage(1)).getAnnotations();
-    const get=fn=>{const w=ann.find(a=>a.fieldName?.trim()===fn);return w?.fieldValue||'';};
-    $('jmeno').value=get('jmeno');
-    $('narozeni').value=(get('narozeni')||'').split('/')[0];
-    $('adresa').value=[get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
-    $('psc').value=get('trvale-bydliste-psc');
-    setStatus('PDF ok – můžeš generovat');$('gen').disabled=false;
-  }catch(e){console.error(e);setStatus('Chyba PDF',true);}
+/* ---------- helper na stav ---------- */
+function setStatus(msg, err=false){
+  statusEl.textContent = msg;
+  statusEl.style.color = err ? '#b00' : '#006400';
 }
 
-/* ====== generování DOCX ====== */
-$('gen').addEventListener('click',async()=>{
-  setStatus('Načítám šablonu…');$('gen').disabled=true;
-  try{
-    const res=await fetch('LP_template.docx');if(!res.ok) throw new Error('Šablona nenalezena');
-    const zip=new PizZip(await res.arrayBuffer());
-    const Doc=window.docxtemplater;         // v tomto balíku je to vždy lower-case
-    if(typeof Doc!=='function') throw new Error('Docxtemplater nenačten');
+/* ---------- faktory = 6 řádků ---------- */
+const factorsWrap = qs('factors');
+for(let i=1;i<=6;i++){
+  const row=document.createElement('div');row.className='row';
+  const lab=document.createElement('label');lab.textContent=`Faktor ${i}`;
+  const sel=document.createElement('select');sel.id=`faktor_${i}`;
+  for(let k=1;k<=6;k++) sel.add(new Option(k,k));
+  row.append(lab,sel);factorsWrap.append(row);
+}
 
-    const doc=new Doc(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
-    doc.render({
-      jmeno:$('jmeno').value,
-      narozeni:$('narozeni').value,
-      adresa:$('adresa').value,
-      psc:$('psc').value,
-      pobocka:$('pobocka').value,
-      pozice:$('pozice').value,
-      konzultant:$('konzultant').value,
+/* ---------- drag & click ---------- */
+const drop = qs('drop');
+drop.addEventListener('click',()=>qs('file').click());
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,x=>{
+  x.preventDefault(); drop.classList.add('drag');
+}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,()=>drop.classList.remove('drag')));
+drop.addEventListener('drop',e=>{
+  e.preventDefault();
+  if(e.dataTransfer.files[0]) handlePDF(e.dataTransfer.files[0]);
+});
+qs('file').addEventListener('change',e=>{
+  if(e.target.files[0]) handlePDF(e.target.files[0]);
+});
+
+/* ---------- PDF → formulář ---------- */
+async function handlePDF(file){
+  if(file.type!=='application/pdf'){setStatus('Není PDF',true);return;}
+  setStatus('Čtu PDF…'); qs('gen').disabled = true;
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const uint=new Uint8Array(await file.arrayBuffer());
+    const pdf=await pdfjsLib.getDocument({data:uint}).promise;
+    const ann=(await pdf.getPage(1)).getAnnotations();
+    const get=fn=>ann.find(a=>a.fieldName?.trim()===fn)?.fieldValue||'';
+
+    qs('jmeno').value = get('jmeno');
+    qs('narozeni').value = (get('narozeni')||'').split('/')[0];
+    qs('adresa').value =
+      [get('trvale-bydliste-ulice'), get('trvale-bydliste-mesto')]
+      .filter(Boolean).join(', ');
+    qs('psc').value = get('trvale-bydliste-psc');
+
+    setStatus('PDF načteno – můžeš generovat'); qs('gen').disabled = false;
+  }catch(e){console.error(e); setStatus('Chyba při čtení PDF', true);}
+}
+
+/* ---------- DOCX ---------- */
+qs('gen').addEventListener('click', async ()=>{
+  setStatus('Načítám šablonu…'); qs('gen').disabled = true;
+  try{
+    const res = await fetch('LP_template.docx');
+    if(!res.ok) throw new Error('Šablona LP_template.docx chybí');
+    const zip = new PizZip(await res.arrayBuffer());
+
+    const Doc = window.docxtemplater;          // balík exportuje takto
+    if(typeof Doc!=='function') throw new Error('Docxtemplater se nenačetl');
+
+    const doc = new Doc(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
+    const ctx = {
+      jmeno:qs('jmeno').value,
+      narozeni:qs('narozeni').value,
+      adresa:qs('adresa').value,
+      psc:qs('psc').value,
+      pobocka:qs('pobocka').value,
+      pozice:qs('pozice').value,
+      konzultant:qs('konzultant').value,
       datum:new Date().toLocaleDateString('cs-CZ')
-    });
-    const blob=doc.getZip().generate({type:'blob'});
-    saveAs(blob,`LP_${($('jmeno').value||'soubor').replace(/\s+/g,'_')}.docx`);
-    setStatus('Hotovo – soubor stažen');
-  }catch(e){console.error(e);setStatus(e.message,true);}
-  $('gen').disabled=false;
+    };
+    for(let i=1;i<=6;i++) ctx[`faktor_${i}`] = qs(`faktor_${i}`).value;
+
+    doc.render(ctx);
+    const blob = doc.getZip().generate({type:'blob'});
+    saveAs(blob,`LP_${(ctx.jmeno||'soubor').replace(/\s+/g,'_')}.docx`);
+    setStatus('DOCX stažen');
+  }catch(e){console.error(e); setStatus(e.message,true);}
+  qs('gen').disabled = false;
 });
 </script>
 </body>

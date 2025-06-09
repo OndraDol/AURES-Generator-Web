@@ -21,7 +21,7 @@
 
 <!-- CDN knihovny -->
 <script src="https://unpkg.com/pizzip@3.1.1/dist/pizzip.min.js"></script>
-<script src="https://unpkg.com/docxtemplater@3.41.2/build/docxtemplater.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.41.2/docxtemplater.js"></script><!-- opravený zdroj -->
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  fillSelect(document.getElementById('pozice_popis'),Object.keys(POSITION_DESCRIPTIONS));
  addFactors();
 
- const key='konzultant', sel=document.getElementById('konzultant');
+ const key='konzultant'; const sel=document.getElementById('konzultant');
  if(localStorage.getItem(key)){sel.value=localStorage.getItem(key);document.getElementById('remember').checked=true;}
  sel.addEventListener('change',()=>{if(document.getElementById('remember').checked)localStorage.setItem(key,sel.value);});
  document.getElementById('remember').addEventListener('change',e=>{
@@ -131,7 +131,7 @@ async function loadPDF(file){
  try{
    const pdfDoc=await PDFLib.PDFDocument.load(bytes);
    const form=pdfDoc.getForm();
-   const g=n=>{try{return form.getTextField(n).getText()||'';}catch{return '';}};
+   const g=n=>{try{return form.getTextField(n).getText()||'';}catch{return '';};};
    const nm=g('jmeno');
    if(nm){
      ok=true;
@@ -143,11 +143,11 @@ async function loadPDF(file){
  }catch{}
  if(!ok){
    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
-   let text='';for(let i=1;i<=pdf.numPages;i++){
+   let txt='';for(let i=1;i<=pdf.numPages;i++){
      const p=await pdf.getPage(i);const c=await p.getTextContent();
-     text+=c.items.map(it=>it.str).join('\n')+'\n';
+     txt+=c.items.map(it=>it.str).join('\n')+'\n';
    }
-   const grab=k=>{const m=text.match(new RegExp(k+'\\s*[:\\-]\\s*([^\\n]+)','i'));return m?m[1].trim():'';};
+   const grab=k=>{const m=txt.match(new RegExp(k+'\\s*[:\\-]\\s*([^\\n]+)','i'));return m?m[1].trim():'';};
    document.getElementById('jmeno').value=grab('jmeno');
    let nar=grab('narozeni');if(nar.includes('/'))nar=nar.split('/')[0];
    document.getElementById('narozeni').value=nar;
@@ -175,19 +175,22 @@ let tplArrayBuffer=null;
 document.getElementById('genDocx').addEventListener('click',async()=>{
  if(!tplArrayBuffer){alert('Nejdřív načti šablonu');return;}
  status('Generuji…');
- let DocxT=null;
- if(window.docxtemplater){
-   if(typeof window.docxtemplater==='function')DocxT=window.docxtemplater;
-   else if(window.docxtemplater.DocxTemplater)DocxT=window.docxtemplater.DocxTemplater;
-   else if(window.docxtemplater.default)DocxT=window.docxtemplater.default;
- }
- if(!DocxT&&typeof window.Docxtemplater==='function')DocxT=window.Docxtemplater;
- if(!DocxT){status('Nenalezen Docxtemplater',true);alert('Docxtemplater se nenačetl – zkontroluj CDN');return;}
 
- const zip=new PizZip(new Uint8Array(tplArrayBuffer));
+ const DocxT = ( typeof window.docxtemplater==='function'      ? window.docxtemplater :
+                 window.docxtemplater?.DocxTemplater            ?
+                   window.docxtemplater.DocxTemplater :
+                 window.docxtemplater?.default                   ?
+                   window.docxtemplater.default :
+                 typeof window.Docxtemplater==='function'        ?
+                   window.Docxtemplater : null );
+
+ if(!DocxT){status('Nenalezen Docxtemplater',true);alert('Knihovna Docxtemplater se nenačetla – zkontroluj CDN');return;}
+
  let doc;
- try{doc=new DocxT(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});}
- catch(e){console.error(e);status('Šablona poškozená',true);alert('Chyba v šabloně');return;}
+ try{
+   const zip=new PizZip(new Uint8Array(tplArrayBuffer));
+   doc=new DocxT(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
+ }catch(e){console.error(e);status('Chyba v šabloně',true);alert('Šablona je poškozená');return;}
 
  const ctx={
    jmeno:document.getElementById('jmeno').value,
@@ -201,16 +204,15 @@ document.getElementById('genDocx').addEventListener('click',async()=>{
    pozice_popis:document.getElementById('pozice_popis').value,
    popis_pozice:POSITION_DESCRIPTIONS[document.getElementById('pozice_popis').value]||''
  };
- document.querySelectorAll('#factors select').forEach(s=>ctx[s.dataset.key]=s.value);
+ document.querySelectorAll('#factors select').forEach(sel=>ctx[sel.dataset.key]=sel.value);
 
- try{doc.render(ctx);}
- catch(e){console.error(e);status('Render selhal',true);alert('Chybná šablona nebo data');return;}
+ try{doc.render(ctx);}catch(e){console.error(e);status('Render selhal',true);alert('Chybná šablona nebo data');return;}
 
  try{
    const blob=doc.getZip().generate({type:'blob'});
    saveAs(blob,`LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
    status('Hotovo – soubor stažen');
- }catch(e){console.error(e);status('Stahování selhalo',true);alert('Prohlížeč zablokoval stahování');}
+ }catch(e){console.error(e);status('Stahování selhalo',true);alert('Prohlížeč zablokoval stažení');}
 });
 </script>
 </body>

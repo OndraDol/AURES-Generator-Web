@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>AURES Generátor LP (web)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
+ h1{font-size:26px;margin-top:0}
+ .row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+ label{width:140px;font-weight:600}
+ input,select{flex:1;padding:6px}
+ select{min-width:220px}
+ button{padding:10px 18px;cursor:pointer;background:#007ACC;color:#fff;border:none;border-radius:4px}
+ #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin-bottom:14px;background:#fff;border-radius:6px}
+ #dropZone.drag{border-color:#000}
+ #tplPrompt{display:none;margin:12px 0;color:#b00}
+ #status{margin-top:14px;font-size:14px;color:#006400}
+</style>
+<!-- CDN knihovny -->
+<script src="https://unpkg.com/pizzip@3.1.1/dist/pizzip.min.js"></script>
+<script src="https://unpkg.com/docxtemplater@3.41.2/build/docxtemplater.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+<h1>AURES Generátor LP</h1>
+
+<div id="dropZone">Přetáhni osobní PDF sem nebo <input type="file" id="fileInput" accept="application/pdf" style="display:inline"/></div>
+
+<div class="row"><label>Jméno</label><input id="jmeno"/></div>
+<div class="row"><label>Datum narození</label><input id="narozeni"/></div>
+<div class="row"><label>Adresa</label><input id="adresa"/></div>
+<div class="row"><label>PSČ</label><input id="psc"/></div>
+
+<h3>Faktory a Kategorie (1–6)</h3>
+<div id="factors"></div>
+
+<div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
+<div class="row"><label>Pozice</label><input id="pozice"/></div>
+<div class="row"><label>Konzultant</label><select id="konzultant"></select><input type="checkbox" id="remember"> <span>Zapamatovat</span></div>
+
+<div class="row"><label>Pozice popis</label><select id="pozice_popis"></select></div>
+
+<p id="tplPrompt">⚠️ Šablonu <strong>LP_template.docx</strong> se nepodařilo načíst. Vyber ji ručně: <input type="file" id="tplInput" accept="application/vnd.openxmlformats-officedocument.wordprocessingml.document"></p>
+
+<div class="row"><button id="genDocx">Generovat DOCX</button></div>
+<p id="status"></p>
+
+<script>
+//------------------------------------------------------------
+// Číselníky
+//------------------------------------------------------------
+const FACTOR_OPTIONS=[
+"Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach","Chemické látky a směsi","------------------",
+"Biologické činitele","Činnosti epidemiologicky závažné","Elektrotechnik dle vyhl č.50 / 1978 Sb.","Neionizující záření","Obsluha tlakových nádob a zařízení vys. napětí","Obsluha transport. a vysokozdvižných vozíků","Obsluha transport. vytáhů a jeřábů a vázaní břemen","Práce v noci","Práce ve výškách a nad volnou hloubkou","Psychická zátěž","Řidič v pracovněprávním vztahu do 7,5 tuny","Řidič v pracovněprávním vztahu nad 7,5 tuny","Vyšetření v základním rozsahu","Zátež teplem","Zraková zátěž"
+];
+const CATEGORY_OPTIONS=["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
+const BRANCH_LIST=["Brno","Chomutov","České Budějovice","Čestlice","Hradec Králové","Jihlava","Kladno","Kolín","Liberec","Mladá Boleslav","Olomouc","Opava","Ostrava","Pardubice","Plzeň","Praha","Sokolov","Tábor","Teplice","Ústí nad Labem","Valašské Meziříčí","Zlín","Znojmo"];
+const CONSULTANT_LIST=["Anna Brůčková","Anna Kučerová","Alžběta Čermáková","Blanka Poliaková","Jan Jarma","Kamila Hušková","Karolína Kulvaitová","Miroslava Válková","Ondřej Dolejš"];
+const POSITION_DESCRIPTIONS={
+"Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
+"Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.",
+"Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.",
+"Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
+"Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
+"Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
+"Uklízečka":"Úklid areálu.",
+"Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+"Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
+"Řidič nad 7,5t":"Přeprava vozů mezi pobočkami, nakládka/vykládka vozů."
+};
+
+//------------------------------------------------------------
+// Helpery UI
+//------------------------------------------------------------
+function fillSelect(sel, arr){sel.innerHTML="";arr.forEach(v=>{const o=document.createElement('option');o.textContent=o.value=v;sel.appendChild(o);});}
+function addFactors(){const wrap=document.getElementById('factors');for(let i=0;i<6;i++){const d=document.createElement('div');d.className='row';const f=document.createElement('select');fillSelect(f,FACTOR_OPTIONS);const k=document.createElement('select');fillSelect(k,CATEGORY_OPTIONS);if(i===0){f.value='Vyšetření v základním rozsahu';k.value='Kat. 1';}f.dataset.key=`faktor${i+1}`;k.dataset.key=`kategorie${i+1}`;d.appendChild(f);d.appendChild(k);wrap.appendChild(d);} }
+function status(msg,err=false){const s=document.getElementById('status');s.textContent=msg;s.style.color=err?'#b00':'#006400';}
+
+//------------------------------------------------------------
+// Inicializace
+//------------------------------------------------------------
+function init(){
+ fillSelect(document.getElementById('pobocka'),BRANCH_LIST);
+ fillSelect(document.getElementById('konzultant'),CONSULTANT_LIST);
+ fillSelect(document.getElementById('pozice_popis'),Object.keys(POSITION_DESCRIPTIONS));
+ addFactors();
+ const LKEY='konzultant';const konz=document.getElementById('konzultant');if(localStorage.getItem(LKEY)){konz.value=localStorage.getItem(LKEY);document.getElementById('remember').checked=true;}
+ konz.addEventListener('change',()=>{if(document.getElementById('remember').checked)localStorage.setItem(LKEY,konz.value);});
+ document.getElementById('remember').addEventListener('change',e=>{if(!e.target.checked)localStorage.removeItem(LKEY);else localStorage.setItem(LKEY,konz.value);});
+}
+document.addEventListener('DOMContentLoaded',init);
+
+//------------------------------------------------------------
+// PDF načtení
+//------------------------------------------------------------
+async function loadPDF(file){status('Načítám PDF…');
+ const bytes=await file.arrayBuffer(); let ok=false;
+ try{const pdfDoc=await PDFLib.PDFDocument.load(bytes);const form=pdfDoc.getForm();const g=n=>{try{return form.getTextField(n).getText()||'';}catch{return ''}};const name=g('jmeno');if(name){ok=true;document.getElementById('jmeno').value=name;document.getElementById('narozeni').value=g('narozeni').split('/')[0].trim();document.getElementById('adresa').value=[g('trvale-bydliste-ulice'),g('trvale-bydliste-mesto')].filter(Boolean).join(', ');document.getElementById('psc').value=g('trvale-bydliste-psc');}}
+ catch(err){console.warn(err)}
+ if(!ok){const pdf=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;let txt='';for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const tc=await p.getTextContent();txt+=tc.items.map(it=>it.str).join('\n')+'\n';}
+  const grab=k=>{const m=txt.match(new RegExp(k+'\s*:\s*([^\n]+)','i'));return m?m[1].trim():'';};
+  document.getElementById('jmeno').value=grab('jmeno');let nar=grab('narozeni');if(nar.includes('/'))nar=nar.split('/')[0];document.getElementById('narozeni').value=nar;document.getElementById('adresa').value=[grab('trvale-bydliste-ulice'),grab('trvale-bydliste-mesto')].filter(Boolean).join(', ');document.getElementById('psc').value=grab('trvale-bydliste-psc');
+ }
+ status('PDF načteno');
+}
+
+const dz=document.getElementById('dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{dz.classList.remove('drag');}));dz.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
+
+//------------------------------------------------------------
+// Šablona
+//------------------------------------------------------------
+let tplArrayBuffer=null;
+async function fetchTemplate(){
+ try{const resp=await fetch('LP_template.docx');if(!resp.ok)throw new Error('fetch err');tplArrayBuffer=await resp.arrayBuffer();status('Šablona načtena');}
+ catch{document.getElementById('tplPrompt').style.display='block';status('Čekám na šablonu');}
+}
+fetchTemplate();
+const tplInput=document.getElementById('tplInput');
+if(tplInput){tplInput.addEventListener('change',e=>{if(e.target.files[0])e.target.files[0].arrayBuffer().then(buf=>{tplArrayBuffer=buf;document.getElementById('tplPrompt').textContent='Šablona načtena ✓';status('Šablona načtena');});});}
+
+//------------------------------------------------------------
+// Generate
+//------------------------------------------------------------
+function val(id){return document.getElementById(id).value;}
+async function generateDocx(){
+ if(!tplArrayBuffer){alert('Nejdřív načti šablonu LP_template.docx');return;}
+ status('Generuji…');
+ let doc;
+ try{// PizZip má občas problém s ArrayBuffer – radši převedeme
+ const zip=new PizZip(tplArrayBuffer instanceof ArrayBuffer ? new Uint8Array(tplArrayBuffer) : tplArrayBuffer);doc=new window.docxtemplater(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});}
+ catch(e){console.error(e);status('Šablona poškozená',true);alert('Šablona se nedá načíst – je správná?');return;}
+ const ctx={jmeno:val('jmeno'),narozeni:val('narozeni'),adresa:val('adresa'),psc:val('psc'),pozice:val('pozice'),pobocka:val('pobocka'),konzultant:val('konzultant'),datum:new Date().toLocaleDateString('cs-CZ'),pozice_popis:val('pozice_popis'),popis_pozice:POSITION_DESCRIPTIONS[val('pozice_popis')]||''};
+ document.querySelectorAll('#factors select').forEach(sel=>{ctx[sel.dataset.key]=sel.value;});
+ try{doc.render(ctx);}catch(e){console.error(e);status('Chyba při doplňování dat',true);alert('Chyba v šabloně nebo nevyplněná povinná pole. Detaily v konzoli (F12).');return;}
+ const blob=doc.getZip().generate({type:'blob'});
+ try{saveAs(blob,`LP_${(ctx.jmeno.split(' ').pop()||'posudek').replace(/[^A-Za-zÁ-Žá-ž]/g,'')}.docx`);status('Hotovo – soubor stažen');}
+ catch(e){console.error(e);status('Prohlížeč zablokoval stažení',true);alert('Nepovedlo se stáhnout soubor – zkus jiný prohlížeč nebo HTTPS.');}
+}
+document.getElementById('genDocx').addEventListener('click',generateDocx);
+</script>
+
+<p style="font-size:12px;margin-top:40px;color:#666">Pokud stránku spouštíš z <code>file://</code>, některé prohlížeče blokují načítání souborů a stahování. Když něco nejde, otevři konzoli (F12 → Console) a pošli mi chybu.</p>
+</body>
+</html>

@@ -16,15 +16,13 @@
  button{padding:10px 18px;cursor:pointer;background:#007ACC;color:#fff;border:none;border-radius:4px}
  #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin-bottom:14px;background:#fff;border-radius:6px}
  #dropZone.drag{border-color:#000}
- #status{margin-top:14px;font-size:14px}
+ #status{margin-top:14px;font-size:14px;min-height:18px}
 </style>
 
-<!-- CDN knihovny -->
-<script src="https://unpkg.com/pizzip@3.1.1/dist/pizzip.min.js"></script>
-<script src="https://unpkg.com/docxtemplater@3.41.2/build/docxtemplater.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<!-- knihovny -->
+<script src="https://unpkg.com/docxtemplater@3.29.0/build/docxtemplater.pizzip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -44,19 +42,23 @@
 <div id="factors"></div>
 
 <div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
-<div class="row"><label>Pozice</label><input id="pozice"></div>
-<div class="row">
-  <label>Konzultant</label>
+<div class="row"><label>Pozice</label><input id="pozice" value="Prodejce"></div>
+
+<div class="row"><label>Konzultant</label>
   <select id="konzultant"></select>
   <input type="checkbox" id="remember"><span>Zapamatovat</span>
 </div>
+
 <div class="row"><label>Pozice popis</label><select id="pozice_popis"></select></div>
 
 <div class="row"><button id="genDocx">Generovat DOCX</button></div>
 <p id="status"></p>
 
 <script>
-/* ---------- konstanty ---------- */
+/* ========== konstanty ========== */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 const FACTOR_OPTIONS=[
  "Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
  "Chemické látky a směsi","------------------","Biologické činitele",
@@ -94,26 +96,26 @@ const POSITION_DESCRIPTIONS={
  "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami, nakládka/vykládka vozů."
 };
 
-/* ---------- UI helpery ---------- */
-const fillSelect=(el,arr)=>{el.innerHTML='';arr.forEach(v=>{const o=document.createElement('option');o.value=o.textContent=v;el.appendChild(o);});};
+/* ========== helpery UI ========== */
+const fill=(sel,arr)=>{sel.innerHTML='';arr.forEach(v=>{const o=document.createElement('option');o.textContent=o.value=v;sel.appendChild(o);});};
 const addFactors=()=>{
  const wrap=document.getElementById('factors');
  for(let i=0;i<6;i++){
    const row=document.createElement('div');row.className='row';
-   const f=document.createElement('select');fillSelect(f,FACTOR_OPTIONS);
-   const k=document.createElement('select');fillSelect(k,CATEGORY_OPTIONS);
+   const f=document.createElement('select');fill(f,FACTOR_OPTIONS);
+   const k=document.createElement('select');fill(k,CATEGORY_OPTIONS);
    if(i===0){f.value='Vyšetření v základním rozsahu';k.value='Kat. 1';}
    f.dataset.key=`faktor${i+1}`;k.dataset.key=`kategorie${i+1}`;
    row.appendChild(f);row.appendChild(k);wrap.appendChild(row);
  }
 };
-const status=(t,err=false)=>{const s=document.getElementById('status');s.textContent=t;s.style.color=err?'#b00':'#006400';};
+const setStatus=(t,err=false)=>{const s=document.getElementById('status');s.textContent=t;s.style.color=err?'#b00':'#006400';};
 
-/* ---------- init ---------- */
+/* ========== init ========== */
 document.addEventListener('DOMContentLoaded',()=>{
- fillSelect(document.getElementById('pobocka'),BRANCH_LIST);
- fillSelect(document.getElementById('konzultant'),CONSULTANT_LIST);
- fillSelect(document.getElementById('pozice_popis'),Object.keys(POSITION_DESCRIPTIONS));
+ fill(document.getElementById('pobocka'),BRANCH_LIST);
+ fill(document.getElementById('konzultant'),CONSULTANT_LIST);
+ fill(document.getElementById('pozice_popis'),Object.keys(POSITION_DESCRIPTIONS)); // popisy doplněny
  addFactors();
 
  const key='konzultant', sel=document.getElementById('konzultant');
@@ -124,93 +126,75 @@ document.addEventListener('DOMContentLoaded',()=>{
  });
 });
 
-/* ---------- PDF načtení ---------- */
+/* ========== PDF načtení ========== */
 async function loadPDF(file){
- status('Načítám PDF…');
- const bytes=await file.arrayBuffer(); let ok=false;
- try{
-   const pdfDoc=await PDFLib.PDFDocument.load(bytes);
-   const form=pdfDoc.getForm();
+ setStatus('Načítám PDF…');
+ const uint=new Uint8Array(await file.arrayBuffer()); let ok=false;
+ try{ // 1) zkusíme AcroForm přes pdf-lib
+   const pdf=await PDFLib.PDFDocument.load(uint);
+   const form=pdf.getForm();
    const g=n=>{try{return form.getTextField(n).getText()||'';}catch{return '';}};
-   const nm=g('jmeno');
-   if(nm){
-     ok=true;
-     document.getElementById('jmeno').value=nm;
-     document.getElementById('narozeni').value=g('narozeni').split('/')[0].trim();
-     document.getElementById('adresa').value=[g('trvale-bydliste-ulice'),g('trvale-bydliste-mesto')].filter(Boolean).join(', ');
-     document.getElementById('psc').value=g('trvale-bydliste-psc');
+   if(g('jmeno')){ok=true;
+     jmeno.value=g('jmeno');
+     narozeni.value=g('narozeni').split('/')[0].trim();
+     adresa.value=[g('trvale-bydliste-ulice'),g('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+     psc.value=g('trvale-bydliste-psc');
    }
  }catch{}
- if(!ok){
-   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
-   let text='';for(let i=1;i<=pdf.numPages;i++){
-     const p=await pdf.getPage(i);const c=await p.getTextContent();
-     text+=c.items.map(it=>it.str).join('\n')+'\n';
-   }
-   const grab=k=>{const m=text.match(new RegExp(k+'\\s*[:\\-]\\s*([^\\n]+)','i'));return m?m[1].trim():'';};
-   document.getElementById('jmeno').value=grab('jmeno');
-   let nar=grab('narozeni');if(nar.includes('/'))nar=nar.split('/')[0];
-   document.getElementById('narozeni').value=nar;
-   document.getElementById('adresa').value=[grab('trvale-bydliste-ulice'),grab('trvale-bydliste-mesto')].filter(Boolean).join(', ');
-   document.getElementById('psc').value=grab('trvale-bydliste-psc');
+ if(!ok){ // 2) fallback pdf.js
+   const pdf=await pdfjsLib.getDocument({data:uint}).promise;
+   const page=await pdf.getPage(1);
+   const ann=await page.getAnnotations({intent:'display'});        // ← pole, find OK
+   const val=n=>ann.find(a=>a.fieldName?.trim()===n)?.fieldValue||'';
+   jmeno.value=val('jmeno');
+   narozeni.value=(val('narozeni')||'').split('/')[0];
+   adresa.value=[val('trvale-bydliste-ulice'),val('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+   psc.value=val('trvale-bydliste-psc');
  }
- status('PDF načteno');
+ setStatus('PDF načteno');
 }
 const dz=document.getElementById('dropZone');
-['dragenter','dragover'].forEach(e=>dz.addEventListener(e,x=>{x.preventDefault();dz.classList.add('drag');}));
-['dragleave','drop'].forEach(e=>dz.addEventListener(e,x=>{dz.classList.remove('drag');}));
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('drag')));
 dz.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
 
-/* ---------- šablona ---------- */
-let tplArrayBuffer=null;
+/* ========== šablona ========== */
+let tplArray=null;
 (async()=>{
  try{
    const r=await fetch('LP_template.docx');if(!r.ok)throw 0;
-   tplArrayBuffer=await r.arrayBuffer();status('Šablona načtena');
- }catch{status('Čekám na šablonu',true);}
+   tplArray=await r.arrayBuffer();setStatus('Šablona načtena');
+ }catch{setStatus('Čekám na šablonu',true);}
 })();
 
-/* ---------- generování ---------- */
-document.getElementById('genDocx').addEventListener('click',async()=>{
- if(!tplArrayBuffer){alert('Nejdřív načti šablonu');return;}
- status('Generuji…');
- let DocxT=null;
- if(window.docxtemplater){
-   if(typeof window.docxtemplater==='function')DocxT=window.docxtemplater;
-   else if(window.docxtemplater.DocxTemplater)DocxT=window.docxtemplater.DocxTemplater;
-   else if(window.docxtemplater.default)DocxT=window.docxtemplater.default;
- }
- if(!DocxT&&typeof window.Docxtemplater==='function')DocxT=window.Docxtemplater;
- if(!DocxT){status('Nenalezen Docxtemplater',true);alert('Docxtemplater se nenačetl – zkontroluj CDN');return;}
-
- const zip=new PizZip(new Uint8Array(tplArrayBuffer));
- let doc;
- try{doc=new DocxT(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});}
- catch(e){console.error(e);status('Šablona poškozená',true);alert('Chyba v šabloně');return;}
-
- const ctx={
-   jmeno:document.getElementById('jmeno').value,
-   narozeni:document.getElementById('narozeni').value,
-   adresa:document.getElementById('adresa').value,
-   psc:document.getElementById('psc').value,
-   pozice:document.getElementById('pozice').value,
-   pobocka:document.getElementById('pobocka').value,
-   konzultant:document.getElementById('konzultant').value,
-   datum:new Date().toLocaleDateString('cs-CZ'),
-   pozice_popis:document.getElementById('pozice_popis').value,
-   popis_pozice:POSITION_DESCRIPTIONS[document.getElementById('pozice_popis').value]||''
- };
- document.querySelectorAll('#factors select').forEach(s=>ctx[s.dataset.key]=s.value);
-
- try{doc.render(ctx);}
- catch(e){console.error(e);status('Render selhal',true);alert('Chybná šablona nebo data');return;}
-
+/* ========== generování ========== */
+genDocx.addEventListener('click',async()=>{
+ if(!tplArray){alert('Nejdřív načti šablonu');return;}
+ setStatus('Generuji…');
  try{
-   const blob=doc.getZip().generate({type:'blob'});
-   saveAs(blob,`LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
-   status('Hotovo – soubor stažen');
- }catch(e){console.error(e);status('Stahování selhalo',true);alert('Prohlížeč zablokoval stahování');}
+   const doc=new window.docxtemplater(new PizZip(new Uint8Array(tplArray)),
+     {paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
+
+   const ctx={
+     jmeno:jmeno.value,
+     narozeni:narozeni.value,
+     adresa:adresa.value,
+     psc:psc.value,
+     pozice:pozice.value,
+     pobocka:pobocka.value,
+     konzultant:konzultant.value,
+     datum:new Date().toLocaleDateString('cs-CZ'),
+     pozice_popis:pozice_popis.value,
+     popis_pozice:POSITION_DESCRIPTIONS[pozice_popis.value]||''
+   };
+   document.querySelectorAll('#factors select').forEach(s=>ctx[s.dataset.key]=s.value);
+
+   doc.render(ctx);
+   saveAs(doc.getZip().generate({type:'blob'}),
+          `LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
+   setStatus('Hotovo – soubor stažen');
+ }catch(e){console.error(e);setStatus('Chyba: '+e.message,true);}
 });
 </script>
 </body>

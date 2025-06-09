@@ -88,10 +88,8 @@
       "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
       "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
       "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
-      "Uklízečka":"Úklid areálu.",
-      "Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
-      "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
-      "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
+      "Uklízečka":"Úklid areálu.","Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+      "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.","Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
     };
 
     // Naplnění selectů
@@ -181,9 +179,10 @@
       const zip = new PizZip(new Uint8Array(tplBuf));
       let xml = zip.file('word/document.xml').asText();
 
-      // sjednotit runy
+      // 1) Sjednotit runy, aby placeholdery byly v jednom kuse
       xml = xml.replace(/<\/w:r>\s*<w:r[^>]*>/g, '');
 
+      // 2) Kontekst
       const ctx = {
         jmeno: $('jmeno').value,
         narozeni: $('narozeni').value,
@@ -197,12 +196,12 @@
         datum: new Date().toLocaleDateString('cs-CZ')
       };
 
-      // základní nahrazení
+      // 3) Základní nahrazení
       Object.entries(ctx).forEach(([k,v]) => {
         xml = xml.replace(new RegExp('\\{\\{\\s*'+k+'\\s*\\}\\}','g'), esc(v));
       });
 
-      // faktory a kategorie
+      // 4) Nahrazení faktorů a kategorií
       for (let i = 1; i <= 6; i++) {
         xml = xml.replace(
           new RegExp(`\\{\\{\\s*faktor${i}\\s*\\}\\}`,'g'),
@@ -216,8 +215,8 @@
 
       zip.file('word/document.xml', xml);
       const blob = zip.generate({
-        type:'blob',
-        mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       });
       saveAs(blob, `LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
       msg('Hotovo – soubor stažen');

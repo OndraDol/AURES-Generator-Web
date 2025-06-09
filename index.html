@@ -7,6 +7,7 @@
   <style>
     body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
     h1{font-size:26px;margin-bottom:20px}
+    h3{margin-top:30px}
     .row{display:flex;gap:12px;margin-bottom:12px;align-items:center}
     label{width:140px;font-weight:600}
     input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px}
@@ -46,6 +47,7 @@
 
   <script>
   document.addEventListener('DOMContentLoaded', () => {
+    // PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
@@ -56,6 +58,7 @@
       statusEl.style.color = err ? '#b00' : '#006400';
     };
 
+    // Data
     const FACTOR = [
       "Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
       "Chemické látky a směsi","------------------","Biologické činitele",
@@ -79,9 +82,19 @@
       "Ondřej Dolejš"
     ];
     const POS_DESC = {
-      "Call Centrum":"Činnost s klienty po telefonu...","Manažer/Zástupce manažera":"Vedení týmu...","Prodejce":"Jednání s klienty...","Nákupčí / Testovací technik":"Administrativa + testování vozů...","Výpomoc při přípravě vozů k prodeji":"Mytí a čištění...","Mechanik":"Údržba a opravy...","Uklízečka":"Úklid areálu.","Stock kontrolor":"Kontrola vozového parku...","Řidič do 7,5t/ Kurýr":"Přeprava...","Řidič nad 7,5t":"Přeprava vozů..."
+      "Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
+      "Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.",
+      "Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.",
+      "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
+      "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
+      "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
+      "Uklízečka":"Úklid areálu.",
+      "Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+      "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
+      "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
     };
 
+    // Naplnění selectů
     const fill = (sel, arr) => {
       sel.innerHTML = '';
       arr.forEach(v => sel.add(new Option(v, v)));
@@ -90,96 +103,122 @@
     fill($('konzultant'), CONSULT_LIST);
     fill($('pozice_popis'), Object.keys(POS_DESC));
 
+    // Faktory
     for (let i = 1; i <= 6; i++) {
       const row = document.createElement('div');
       row.className = 'row';
       const sf = document.createElement('select');
       const sk = document.createElement('select');
-      sf.id = 'faktor'+i;
-      sk.id = 'kategorie'+i;
+      sf.id = 'faktor' + i;
+      sk.id = 'kategorie' + i;
       fill(sf, FACTOR);
       fill(sk, CAT);
-      if (i===1){ sf.value="Vyšetření v základním rozsahu"; sk.value="Kat. 1"; }
+      if (i === 1) {
+        sf.value = "Vyšetření v základním rozsahu";
+        sk.value = "Kat. 1";
+      }
       row.append(sf, sk);
       $('factors').append(row);
     }
 
+    // Drag & drop
     const dz = $('dropZone'), fi = $('fileInput');
-    dz.addEventListener('click', ()=> fi.click());
-    ['dragenter','dragover'].forEach(ev=>
-      dz.addEventListener(ev,e=>{ e.preventDefault(); dz.classList.add('drag'); })
+    dz.addEventListener('click', () => fi.click());
+    ['dragenter','dragover'].forEach(ev =>
+      dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); })
     );
-    ['dragleave','drop'].forEach(ev=>
-      dz.addEventListener(ev,()=>dz.classList.remove('drag'))
+    ['dragleave','drop'].forEach(ev =>
+      dz.addEventListener(ev, () => dz.classList.remove('drag'))
     );
-    dz.addEventListener('drop', e=>{
+    dz.addEventListener('drop', e => {
       e.preventDefault();
-      if(e.dataTransfer.files[0]) handlePDF(e.dataTransfer.files[0]);
+      if (e.dataTransfer.files[0]) handlePDF(e.dataTransfer.files[0]);
     });
-    fi.addEventListener('change', e=>{
-      if(e.target.files[0]) handlePDF(e.target.files[0]);
+    fi.addEventListener('change', e => {
+      if (e.target.files[0]) handlePDF(e.target.files[0]);
     });
 
-    async function handlePDF(file){
+    // Čtení PDF
+    async function handlePDF(file) {
       msg('Čtu PDF…');
       $('genDocx').disabled = true;
       try {
         const data = new Uint8Array(await file.arrayBuffer());
-        const pdf = await pdfjsLib.getDocument({data}).promise;
+        const pdf = await pdfjsLib.getDocument({ data }).promise;
         const page = await pdf.getPage(1);
-        const ann = await page.getAnnotations({intent:'display'});
-        const get = name=> ann.find(a=>a.fieldName?.trim()===name)?.fieldValue||'';
+        const ann = await page.getAnnotations({ intent:'display' });
+        const get = name => ann.find(a => a.fieldName?.trim() === name)?.fieldValue || '';
         $('jmeno').value = get('jmeno');
         $('narozeni').value = (get('narozeni')||'').split('/')[0].trim();
-        $('adresa').value = [get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+        $('adresa').value = [get('trvale-bydliste-ulice'), get('trvale-bydliste-mesto')]
+                              .filter(Boolean).join(', ');
         $('psc').value = get('trvale-bydliste-psc');
         msg('PDF načteno');
         $('genDocx').disabled = false;
-      } catch(e){
+      } catch (e) {
         console.error(e);
         msg('Chyba při čtení PDF', true);
       }
     }
 
+    // Načtení šablony
     let tplBuf = null;
     fetch('LP_template.docx')
-      .then(r=> r.ok? r.arrayBuffer(): Promise.reject())
-      .then(b=>{ tplBuf=b; msg('Šablona načtena'); })
-      .catch(()=> msg('Šablonu nejde načíst', true));
+      .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+      .then(b => { tplBuf = b; msg('Šablona načtena'); })
+      .catch(() => msg('Šablonu nelze načíst', true));
 
-    const esc = s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const esc = s => s
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
 
-    $('genDocx').addEventListener('click',()=>{
-      if(!tplBuf){ alert('Nejdřív načti šablonu'); return; }
+    // Generování DOCX
+    $('genDocx').addEventListener('click', () => {
+      if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
       msg('Generuji…');
       const zip = new PizZip(new Uint8Array(tplBuf));
       let xml = zip.file('word/document.xml').asText();
 
-      // sjednotit runy, aby placeholder byl v jednom kuse
+      // sjednotit runy
       xml = xml.replace(/<\/w:r>\s*<w:r[^>]*>/g, '');
 
       const ctx = {
-        jmeno:$('jmeno').value,
-        narozeni:$('narozeni').value,
-        adresa:$('adresa').value,
-        psc:$('psc').value,
-        pobocka:$('pobocka').value,
-        pozice:$('pozice').value,
-        konzultant:$('konzultant').value,
-        pozice_popis:$('pozice_popis').value,
-        popis_pozice:POS_DESC[$('pozice_popis').value]||'',
-        datum:new Date().toLocaleDateString('cs-CZ')
+        jmeno: $('jmeno').value,
+        narozeni: $('narozeni').value,
+        adresa: $('adresa').value,
+        psc: $('psc').value,
+        pobocka: $('pobocka').value,
+        pozice: $('pozice').value,
+        konzultant: $('konzultant').value,
+        pozice_popis: $('pozice_popis').value,
+        popis_pozice: POS_DESC[$('pozice_popis').value] || '',
+        datum: new Date().toLocaleDateString('cs-CZ')
       };
-      Object.entries(ctx).forEach(([k,v])=>{
+
+      // základní nahrazení
+      Object.entries(ctx).forEach(([k,v]) => {
         xml = xml.replace(new RegExp('\\{\\{\\s*'+k+'\\s*\\}\\}','g'), esc(v));
       });
-      for(let i=1;i<=6;i++){
-        xml = xml.replace(new RegExp(`\\{\\{\\s*faktor${i}\\s*\\}\\}`,'g'), esc($('faktor'+i).value));
-        xml = xml.replace(new RegExp(`\\{\\{\\s*kategorie${i}\\s*\\}\\}`,'g'), esc($('kategorie'+i).value));
+
+      // faktory a kategorie
+      for (let i = 1; i <= 6; i++) {
+        xml = xml.replace(
+          new RegExp(`\\{\\{\\s*faktor${i}\\s*\\}\\}`,'g'),
+          esc($('faktor'+i).value)
+        );
+        xml = xml.replace(
+          new RegExp(`\\{\\{\\s*kategorie${i}\\s*\\}\\}`,'g'),
+          esc($('kategorie'+i).value)
+        );
       }
 
       zip.file('word/document.xml', xml);
-      const blob = zip.generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+      const blob = zip.generate({
+        type:'blob',
+        mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
       saveAs(blob, `LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
       msg('Hotovo – soubor stažen');
     });

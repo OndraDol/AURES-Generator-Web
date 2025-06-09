@@ -4,32 +4,35 @@
 <meta charset="utf-8">
 <title>AURES Generátor LP</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="data:,">
+<link rel="icon" href="data:,"><!-- zruší 404 na favicon -->
 
 <style>
  body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
- h1{font-size:26px;margin:0 0 20px}
- .row{display:flex;gap:12px;margin-bottom:10px;align-items:center}
+ h1{font-size:26px;margin-top:0}
+ .row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
  label{width:140px;font-weight:600}
- input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px}
- button{padding:8px 16px;background:#007acc;color:#fff;border:none;border-radius:4px;cursor:pointer}
- button:disabled{background:#ccc;cursor:not-allowed}
- #drop{border:2px dashed #888;padding:20px;text-align:center;margin:20px 0;border-radius:6px;background:#fff}
- #drop.drag{border-color:#007acc;background:#eef6ff}
- #status{margin-top:12px;font-size:14px;min-height:18px}
+ input,select{flex:1;padding:6px}
+ select{min-width:220px}
+ button{padding:10px 18px;cursor:pointer;background:#007ACC;color:#fff;border:none;border-radius:4px}
+ #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin-bottom:14px;background:#fff;border-radius:6px}
+ #dropZone.drag{border-color:#000}
+ #status{margin-top:14px;font-size:14px}
 </style>
 
-<!-- knihovny -->
-<script defer src="https://unpkg.com/docxtemplater@3.29.0/build/docxtemplater.pizzip.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/file-saver/2.0.5/FileSaver.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+<!-- CDN knihovny -->
+<script src="https://unpkg.com/pizzip@3.1.1/dist/pizzip.min.js"></script>
+<script src="https://unpkg.com/docxtemplater@3.41.2/build/docxtemplater.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 </head>
+
 <body>
 <h1>AURES Generátor LP</h1>
 
-<div id="drop">
-  Přetáhni PDF nebo klikni
-  <input type="file" id="file" accept="application/pdf" hidden>
+<div id="dropZone">
+  Přetáhni osobní PDF sem nebo
+  <input type="file" id="fileInput" accept="application/pdf">
 </div>
 
 <div class="row"><label>Jméno</label><input id="jmeno"></div>
@@ -37,114 +40,177 @@
 <div class="row"><label>Adresa</label><input id="adresa"></div>
 <div class="row"><label>PSČ</label><input id="psc"></div>
 
-<h3>Faktory (1 – 6)</h3>
+<h3>Faktory a kategorie (1 – 6)</h3>
 <div id="factors"></div>
 
-<div class="row"><label>Pobočka</label>
-  <select id="pobocka">
-    <option>Praha</option><option>Brno</option><option>Ostrava</option>
-  </select>
+<div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
+<div class="row"><label>Pozice</label><input id="pozice"></div>
+<div class="row">
+  <label>Konzultant</label>
+  <select id="konzultant"></select>
+  <input type="checkbox" id="remember"><span>Zapamatovat</span>
 </div>
-<div class="row"><label>Pozice</label><input id="pozice" value="Prodejce"></div>
+<div class="row"><label>Pozice popis</label><select id="pozice_popis"></select></div>
 
-<!-- DOPLNĚNÝ číselník -->
-<div class="row"><label>Popis pozice</label>
-  <select id="popis">
-    <option>Řidič referent</option>
-    <option>Práce s PC</option>
-    <option>Práce ve skladu</option>
-  </select>
-</div>
-
-<div class="row"><label>Konzultant</label>
-  <select id="konzultant">
-    <option>Jan Novák</option><option>Petra Dvořáková</option>
-  </select>
-</div>
-
-<div class="row"><button id="gen" disabled>Generovat DOCX</button></div>
+<div class="row"><button id="genDocx">Generovat DOCX</button></div>
 <p id="status"></p>
 
 <script>
-/* ---------- pdf.js worker ---------- */
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+/* ---------- konstanty ---------- */
+const FACTOR_OPTIONS=[
+ "Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
+ "Chemické látky a směsi","------------------","Biologické činitele",
+ "Činnosti epidemiologicky závažné",
+ "Elektrotechnik dle vyhl č.50 / 1978 Sb.","Neionizující záření",
+ "Obsluha tlakových nádob a zařízení vys. napětí",
+ "Obsluha transport. a vysokozdvižných vozíků",
+ "Obsluha transport. vytáhů a jeřábů a vázaní břemen",
+ "Práce v noci","Práce ve výškách a nad volnou hloubkou","Psychická zátěž",
+ "Řidič do 7,5 tuny","Řidič nad 7,5 tuny",
+ "Vyšetření v základním rozsahu","Zátěž teplem","Zraková zátěž"
+];
+const CATEGORY_OPTIONS=["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
+const BRANCH_LIST=[
+ "Brno","Chomutov","České Budějovice","Čestlice","Hradec Králové","Jihlava",
+ "Kladno","Kolín","Liberec","Mladá Boleslav","Olomouc","Opava","Ostrava",
+ "Pardubice","Plzeň","Praha","Sokolov","Tábor","Teplice","Ústí nad Labem",
+ "Valašské Meziříčí","Zlín","Znojmo"
+];
+const CONSULTANT_LIST=[
+ "Anna Brůčková","Anna Kučerová","Alžběta Čermáková","Blanka Poliaková",
+ "Jan Jarma","Kamila Hušková","Karolína Kulvaitová","Miroslava Válková",
+ "Ondřej Dolejš"
+];
+const POSITION_DESCRIPTIONS={
+ "Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
+ "Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.",
+ "Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.",
+ "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
+ "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
+ "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
+ "Uklízečka":"Úklid areálu.",
+ "Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+ "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
+ "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami, nakládka/vykládka vozů."
+};
 
-/* ---------- elementy & helper ---------- */
-const $ = id => document.getElementById(id);
-const setStatus = (t,err=false)=>{ $('status').textContent=t; $('status').style.color=err?'#b00':'#006400'; };
+/* ---------- UI helpery ---------- */
+const fillSelect=(el,arr)=>{el.innerHTML='';arr.forEach(v=>{const o=document.createElement('option');o.value=o.textContent=v;el.appendChild(o);});};
+const addFactors=()=>{
+ const wrap=document.getElementById('factors');
+ for(let i=0;i<6;i++){
+   const row=document.createElement('div');row.className='row';
+   const f=document.createElement('select');fillSelect(f,FACTOR_OPTIONS);
+   const k=document.createElement('select');fillSelect(k,CATEGORY_OPTIONS);
+   if(i===0){f.value='Vyšetření v základním rozsahu';k.value='Kat. 1';}
+   f.dataset.key=`faktor${i+1}`;k.dataset.key=`kategorie${i+1}`;
+   row.appendChild(f);row.appendChild(k);wrap.appendChild(row);
+ }
+};
+const status=(t,err=false)=>{const s=document.getElementById('status');s.textContent=t;s.style.color=err?'#b00':'#006400';};
 
-/* ---------- faktory ---------- */
-for(let i=1;i<=6;i++){
-  const row=document.createElement('div');row.className='row';
-  row.innerHTML=`<label>Faktor ${i}</label><select id="faktor_${i}">
-    <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
-  </select>`;
-  $('factors').append(row);
-}
+/* ---------- init ---------- */
+document.addEventListener('DOMContentLoaded',()=>{
+ fillSelect(document.getElementById('pobocka'),BRANCH_LIST);
+ fillSelect(document.getElementById('konzultant'),CONSULTANT_LIST);
+ fillSelect(document.getElementById('pozice_popis'),Object.keys(POSITION_DESCRIPTIONS));
+ addFactors();
 
-/* ---------- drag & click ---------- */
-const drop=$('drop'), fileInput=$('file');
-drop.addEventListener('click',()=>fileInput.click());
-['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{
-  e.preventDefault(); drop.classList.add('drag');}));
-['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,()=>drop.classList.remove('drag')));
-drop.addEventListener('drop',e=>{
-  e.preventDefault(); if(e.dataTransfer.files[0]) loadPDF(e.dataTransfer.files[0]);});
-fileInput.addEventListener('change',e=>{
-  if(e.target.files[0]) loadPDF(e.target.files[0]);
+ const key='konzultant', sel=document.getElementById('konzultant');
+ if(localStorage.getItem(key)){sel.value=localStorage.getItem(key);document.getElementById('remember').checked=true;}
+ sel.addEventListener('change',()=>{if(document.getElementById('remember').checked)localStorage.setItem(key,sel.value);});
+ document.getElementById('remember').addEventListener('change',e=>{
+   if(e.target.checked)localStorage.setItem(key,sel.value);else localStorage.removeItem(key);
+ });
 });
 
-/* ---------- PDF → formulář ---------- */
+/* ---------- PDF načtení ---------- */
 async function loadPDF(file){
-  if(file.type!=='application/pdf'){setStatus('Není PDF',true);return;}
-  setStatus('Čtu PDF…'); $('gen').disabled=true;
-  try{
-    const pdf=await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-    const page=await pdf.getPage(1);
-    const ann=await page.getAnnotations({intent:'display'});   // ← pole OK
-    const val=n=>ann.find(a=>a.fieldName?.trim()===n)?.fieldValue||'';
-
-    $('jmeno').value=val('jmeno');
-    $('narozeni').value=(val('narozeni')||'').split('/')[0];
-    $('adresa').value=[val('trvale-bydliste-ulice'),val('trvale-bydliste-mesto')]
-                  .filter(Boolean).join(', ');
-    $('psc').value=val('trvale-bydliste-psc');
-    setStatus('PDF načteno – můžeš generovat'); $('gen').disabled=false;
-  }catch(e){console.error(e); setStatus('Chyba PDF',true);}
+ status('Načítám PDF…');
+ const bytes=await file.arrayBuffer(); let ok=false;
+ try{
+   const pdfDoc=await PDFLib.PDFDocument.load(bytes);
+   const form=pdfDoc.getForm();
+   const g=n=>{try{return form.getTextField(n).getText()||'';}catch{return '';}};
+   const nm=g('jmeno');
+   if(nm){
+     ok=true;
+     document.getElementById('jmeno').value=nm;
+     document.getElementById('narozeni').value=g('narozeni').split('/')[0].trim();
+     document.getElementById('adresa').value=[g('trvale-bydliste-ulice'),g('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+     document.getElementById('psc').value=g('trvale-bydliste-psc');
+   }
+ }catch{}
+ if(!ok){
+   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
+   let text='';for(let i=1;i<=pdf.numPages;i++){
+     const p=await pdf.getPage(i);const c=await p.getTextContent();
+     text+=c.items.map(it=>it.str).join('\n')+'\n';
+   }
+   const grab=k=>{const m=text.match(new RegExp(k+'\\s*[:\\-]\\s*([^\\n]+)','i'));return m?m[1].trim():'';};
+   document.getElementById('jmeno').value=grab('jmeno');
+   let nar=grab('narozeni');if(nar.includes('/'))nar=nar.split('/')[0];
+   document.getElementById('narozeni').value=nar;
+   document.getElementById('adresa').value=[grab('trvale-bydliste-ulice'),grab('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+   document.getElementById('psc').value=grab('trvale-bydliste-psc');
+ }
+ status('PDF načteno');
 }
+const dz=document.getElementById('dropZone');
+['dragenter','dragover'].forEach(e=>dz.addEventListener(e,x=>{x.preventDefault();dz.classList.add('drag');}));
+['dragleave','drop'].forEach(e=>dz.addEventListener(e,x=>{dz.classList.remove('drag');}));
+dz.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
+document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
 
-/* ---------- DOCX ---------- */
-$('gen').addEventListener('click',async()=>{
-  setStatus('Načítám šablonu…'); $('gen').disabled=true;
-  try{
-    const res=await fetch('LP_template.docx');
-    if(!res.ok) throw new Error('Chybí LP_template.docx');
-    const zip=new PizZip(await res.arrayBuffer());
+/* ---------- šablona ---------- */
+let tplArrayBuffer=null;
+(async()=>{
+ try{
+   const r=await fetch('LP_template.docx');if(!r.ok)throw 0;
+   tplArrayBuffer=await r.arrayBuffer();status('Šablona načtena');
+ }catch{status('Čekám na šablonu',true);}
+})();
 
-    const Doc=window.docxtemplater;               // balík exportuje takto
-    if(typeof Doc!=='function') throw new Error('Docxtemplater se nenačetl');
+/* ---------- generování ---------- */
+document.getElementById('genDocx').addEventListener('click',async()=>{
+ if(!tplArrayBuffer){alert('Nejdřív načti šablonu');return;}
+ status('Generuji…');
+ let DocxT=null;
+ if(window.docxtemplater){
+   if(typeof window.docxtemplater==='function')DocxT=window.docxtemplater;
+   else if(window.docxtemplater.DocxTemplater)DocxT=window.docxtemplater.DocxTemplater;
+   else if(window.docxtemplater.default)DocxT=window.docxtemplater.default;
+ }
+ if(!DocxT&&typeof window.Docxtemplater==='function')DocxT=window.Docxtemplater;
+ if(!DocxT){status('Nenalezen Docxtemplater',true);alert('Docxtemplater se nenačetl – zkontroluj CDN');return;}
 
-    const doc=new Doc(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
-    const ctx={
-      jmeno:$('jmeno').value,
-      narozeni:$('narozeni').value,
-      adresa:$('adresa').value,
-      psc:$('psc').value,
-      pobocka:$('pobocka').value,
-      pozice:$('pozice').value,
-      popis:$('popis').value,
-      konzultant:$('konzultant').value,
-      datum:new Date().toLocaleDateString('cs-CZ')
-    };
-    for(let i=1;i<=6;i++) ctx[`faktor_${i}`]=$(`faktor_${i}`).value;
+ const zip=new PizZip(new Uint8Array(tplArrayBuffer));
+ let doc;
+ try{doc=new DocxT(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});}
+ catch(e){console.error(e);status('Šablona poškozená',true);alert('Chyba v šabloně');return;}
 
-    doc.render(ctx);
-    saveAs(doc.getZip().generate({type:'blob'}),
-           `LP_${(ctx.jmeno||'soubor').replace(/\s+/g,'_')}.docx`);
-    setStatus('DOCX stažen');
-  }catch(e){console.error(e); setStatus(e.message,true);}
-  $('gen').disabled=false;
+ const ctx={
+   jmeno:document.getElementById('jmeno').value,
+   narozeni:document.getElementById('narozeni').value,
+   adresa:document.getElementById('adresa').value,
+   psc:document.getElementById('psc').value,
+   pozice:document.getElementById('pozice').value,
+   pobocka:document.getElementById('pobocka').value,
+   konzultant:document.getElementById('konzultant').value,
+   datum:new Date().toLocaleDateString('cs-CZ'),
+   pozice_popis:document.getElementById('pozice_popis').value,
+   popis_pozice:POSITION_DESCRIPTIONS[document.getElementById('pozice_popis').value]||''
+ };
+ document.querySelectorAll('#factors select').forEach(s=>ctx[s.dataset.key]=s.value);
+
+ try{doc.render(ctx);}
+ catch(e){console.error(e);status('Render selhal',true);alert('Chybná šablona nebo data');return;}
+
+ try{
+   const blob=doc.getZip().generate({type:'blob'});
+   saveAs(blob,`LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
+   status('Hotovo – soubor stažen');
+ }catch(e){console.error(e);status('Stahování selhalo',true);alert('Prohlížeč zablokoval stahování');}
 });
 </script>
 </body>

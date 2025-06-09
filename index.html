@@ -5,21 +5,25 @@
 <title>AURES Generátor LP</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:,">
+
 <style>
  body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
  h1{font-size:26px;margin-top:0}
  .row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
  label{width:140px;font-weight:600}
- input,select{flex:1;min-width:220px;padding:6px}
+ input,select{flex:1;padding:6px}
+ select{min-width:220px}
  button{padding:10px 18px;cursor:pointer;background:#007ACC;color:#fff;border:none;border-radius:4px}
  #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin-bottom:14px;background:#fff;border-radius:6px}
  #dropZone.drag{border-color:#000}
  #status{margin-top:14px;font-size:14px;min-height:18px}
 </style>
 
-<!-- jen dvě maličké knihovny -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.5/pizzip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<!-- dvě různé CDN – první se chytne ve >99 % případů -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.7.0/pizzip.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/pizzip@3.7.0/dist/pizzip.min.js" crossorigin="anonymous"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -39,111 +43,114 @@
 <div class="row"><label>Konzultant</label><select id="konzultant"></select></div>
 <div class="row"><label>Pozice popis</label><select id="popis"></select></div>
 
-<div class="row"><button id="gen">Generovat&nbsp;DOCX</button></div>
+<div class="row"><button id="gen">Generovat DOCX</button></div>
 <p id="status"></p>
 
 <script>
-/* ---------- konstanty ---------- */
+/* ---------- DATA ---------- */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const FACTOR_OPTS=["Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
-                   "Chemické látky a směsi","------------------","Biologické činitele",
-                   "Činnosti epidemiologicky závažné","Elektrotechnik dle vyhl č.50 / 1978 Sb.",
-                   "Neionizující záření","Obsluha tlakových nádob a zařízení vys. napětí",
-                   "Obsluha transport. a vysokozdvižných vozíků",
-                   "Obsluha transport. vytáhů a jeřábů a vázaní břemen","Práce v noci",
-                   "Práce ve výškách a nad volnou hloubkou","Psychická zátěž",
-                   "Řidič do 7,5 tuny","Řidič nad 7,5 tuny",
-                   "Vyšetření v základním rozsahu","Zátěž teplem","Zraková zátěž"];
-const CAT_OPTS=["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
+const FACTOR=["Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
+ "Chemické látky a směsi","------------------","Biologické činitele",
+ "Činnosti epidemiologicky závažné","Elektrotechnik dle vyhl č.50 / 1978 Sb.",
+ "Neionizující záření","Obsluha tlakových nádob a zařízení vys. napětí",
+ "Obsluha transport. a vysokozdvižných vozíků","Obsluha transport. vytáhů a jeřábů a vázaní břemen",
+ "Práce v noci","Práce ve výškách a nad volnou hloubkou","Psychická zátěž",
+ "Řidič do 7,5 tuny","Řidič nad 7,5 tuny","Vyšetření v základním rozsahu",
+ "Zátěž teplem","Zraková zátěž"];
+const CAT=["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
 const BRANCH=["Brno","Praha","Ostrava","Plzeň"];
 const CONSULT=["Jan Novák","Petra Dvořáková"];
-const POS_DESC={
-  "Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
-  "Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.",
-  "Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.",
-  "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
-  "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
-  "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
-  "Uklízečka":"Úklid areálu.",
-  "Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
-  "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
-  "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami, nakládka/vykládka vozů."
+const POSDESC={
+ "Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
+ "Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.",
+ "Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.",
+ "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
+ "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
+ "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
+ "Uklízečka":"Úklid areálu.","Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+ "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.","Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
 };
 
-/* ---------- build UI ---------- */
-const fill=(sel,a)=>{sel.innerHTML="";a.forEach(v=>sel.add(new Option(v,v)));};
-fill(pobocka,BRANCH); fill(konzultant,CONSULT); fill(popis,Object.keys(POS_DESC));
+/* ---------- HELPER UI ---------- */
+const $=id=>document.getElementById(id);
+const fill=(sel,a)=>{sel.innerHTML='';a.forEach(v=>sel.add(new Option(v,v)));};
+const msg=(t,e)=>{status.textContent=t;status.style.color=e?'#b00':'#006400';};
 
+/* ---------- FILL DROPDOWNS ---------- */
+fill(pobocka,BRANCH); fill(konzultant,CONSULT); fill(popis,Object.keys(POSDESC));
 for(let i=1;i<=6;i++){
-  const r=document.createElement('div');r.className='row';
-  r.innerHTML=`<select id="f${i}"></select><select id="k${i}"></select>`;
-  document.getElementById('factors').append(r);
-  fill(r.children[0],FACTOR_OPTS); fill(r.children[1],CAT_OPTS);
-  if(i===1){r.children[0].value="Vyšetření v základním rozsahu";r.children[1].value="Kat. 1";}
+  factors.insertAdjacentHTML('beforeend',
+    `<div class="row"><select id="f${i}"></select><select id="k${i}"></select></div>`);
+  fill($(`f${i}`),FACTOR); fill($(`k${i}`),CAT);
+  if(i===1){$(`f${i}`).value="Vyšetření v základním rozsahu";$(`k${i}`).value="Kat. 1";}
 }
 
-/* ---------- drag & drop ---------- */
-const dz=dropZone, fi=fileInput, statusEl=status;
-dz.addEventListener('click',()=>fi.click());
-['dragenter','dragover'].forEach(e=>dz.addEventListener(e,x=>{x.preventDefault();dz.classList.add('drag');}));
-['dragleave','drop'].forEach(e=>dz.addEventListener(e,()=>dz.classList.remove('drag')));
-dz.addEventListener('drop',e=>{e.preventDefault();fi.files=e.dataTransfer.files;handlePDF(fi.files[0]);});
-fi.addEventListener('change',e=>{if(e.target.files[0])handlePDF(e.target.files[0]);});
-const setStatus=(t,err=false)=>{statusEl.textContent=t;statusEl.style.color=err?'#b00':'#006400';};
+/* ---------- DRAG & DROP ---------- */
+dropZone.onclick=()=>fileInput.click();
+['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{
+ e.preventDefault();dropZone.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,()=>dropZone.classList.remove('drag')));
+dropZone.ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])handlePDF(e.dataTransfer.files[0]);};
+fileInput.onchange=e=>{if(e.target.files[0])handlePDF(e.target.files[0]);};
 
-/* ---------- read PDF ---------- */
-async function handlePDF(file){
- if(!file){setStatus('Žádný soubor',true);return;}
- setStatus('Čtu PDF…');
- const bytes=new Uint8Array(await file.arrayBuffer());
- const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
- const ann=await (await pdf.getPage(1)).getAnnotations({intent:"display"});
- const v=n=>ann.find(a=>a.fieldName?.trim()===n)?.fieldValue||"";
- jmeno.value=v('jmeno');
- narozeni.value=(v('narozeni')||'').split('/')[0];
- adresa.value=[v('trvale-bydliste-ulice'),v('trvale-bydliste-mesto')].filter(Boolean).join(', ');
- psc.value=v('trvale-bydliste-psc');
- setStatus('PDF načteno');
+/* ---------- READ PDF ---------- */
+async function handlePDF(f){
+ msg('Čtu PDF…');
+ try{
+   const pdf=await pdfjsLib.getDocument(await f.arrayBuffer()).promise;
+   const ann=await (await pdf.getPage(1)).getAnnotations({intent:'display'});
+   const g=n=>ann.find(a=>a.fieldName?.trim()===n)?.fieldValue||'';
+   jmeno.value=g('jmeno'); narozeni.value=(g('narozeni')||'').split('/')[0];
+   adresa.value=[g('trvale-bydliste-ulice'),g('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+   psc.value=g('trvale-bydliste-psc');
+   msg('PDF načteno');
+ }catch(e){console.error(e);msg('Chyba PDF',true);}
 }
 
-/* ---------- load template ---------- */
-let tplBuf=null;
-(async()=>{try{
-  const r=await fetch('LP_template.docx');if(!r.ok)throw 0;
-  tplBuf=new Uint8Array(await r.arrayBuffer());setStatus('Šablona načtena');
-}catch{setStatus('Šablonu LP_template.docx se nepodařilo načíst',true);}})();
+/* ---------- LOAD TEMPLATE ---------- */
+let tpl=null;
+fetch('LP_template.docx')
+ .then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(buf=>{tpl=new Uint8Array(buf);msg('Šablona načtena');})
+ .catch(()=>msg('Šablonu LP_template.docx nelze načíst',true));
 
-/* ---------- XML escape ---------- */
+/* ---------- ESCAPE XML ---------- */
 const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-/* ---------- generate ---------- */
-gen.addEventListener('click',()=>{
- if(!tplBuf){alert('Šablona chybí');return;}
- setStatus('Generuji…');
- const zip=new PizZip(tplBuf);
+/* ---------- GENERATE ---------- */
+gen.onclick=async()=>{
+ if(!tpl){alert('Šablona nenalezena');return;}
+ /*  Fallback: pokud z nějakého důvodu přesto není PizZip (firewall zablokoval obě CDN),
+     stáhnu knihovnu dynamicky z jsDelivr, počkám a pak pokračuju. */
+ if(typeof window.PizZip==='undefined'){
+   msg('Stahuji knihovnu…'); await new Promise(res=>{
+     const s=document.createElement('script');
+     s.src='https://cdn.jsdelivr.net/npm/pizzip@3.7.0/dist/pizzip.min.js';
+     s.onload=res;document.head.appendChild(s);
+   });
+   if(typeof window.PizZip==='undefined'){msg('PizZip se nepodařilo načíst',true);return;}
+ }
+ msg('Generuji…');
+ const zip=new PizZip(tpl);
  let xml=zip.file('word/document.xml').asText();
 
  const ctx={
-   jmeno:jmeno.value, narozeni:narozeni.value, adresa:adresa.value, psc:psc.value,
-   pobocka:pobocka.value, pozice:pozice.value, konzultant:konzultant.value,
-   datum:new Date().toLocaleDateString('cs-CZ'),
-   pozice_popis:popis.value, popis_pozice:POS_DESC[popis.value]||''
+   jmeno:jmeno.value,narozeni:narozeni.value,adresa:adresa.value,psc:psc.value,
+   pobocka:pobocka.value,pozice:pozice.value,konzultant:konzultant.value,
+   pozice_popis:popis.value,popis_pozice:POSDESC[popis.value]||'',
+   datum:new Date().toLocaleDateString('cs-CZ')
  };
- for(let i=1;i<=6;i++){ctx[`faktor${i}`]=document.getElementById(`f${i}`).value;
-                       ctx[`kategorie${i}`]=document.getElementById(`k${i}`).value;}
+ for(let i=1;i<=6;i++){ctx[`faktor${i}`]=$(`f${i}`).value;ctx[`kategorie${i}`]=$(`k${i}`).value;}
 
- Object.entries(ctx).forEach(([k,v])=>{
-   xml=xml.split(`{{${k}}}`).join(esc(v));
- });
-
+ Object.entries(ctx).forEach(([k,v])=>xml=xml.split(`{{${k}}}`).join(esc(v)));
  zip.file('word/document.xml',xml);
- const blob=zip.generate({type:'blob',
-   mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
- saveAs(blob,`LP_${(ctx.jmeno||'soubor').replace(/\s+/g,'_')}.docx`);
- setStatus('Hotovo – DOCX stažen');
-});
+
+ saveAs(zip.generate({type:'blob',
+   mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),
+   `LP_${(ctx.jmeno||'soubor').replace(/\s+/g,'_')}.docx`);
+ msg('DOCX stažen');
+};
 </script>
 </body>
 </html>

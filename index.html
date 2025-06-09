@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="cs">
+<!DOCTYPE html>
+<html lang="cs">
 <head>
 <meta charset="utf-8">
 <title>AURES Generátor LP</title>
@@ -36,7 +37,9 @@
   <div class="row"><label>Konzultant</label><select id="konzultant"></select><input type="checkbox" id="remember"><span>Zapamatovat</span></div>
   <div class="row"><label>Pozice popis</label><select id="pozice_popis"></select></div>
   <div class="row"><button id="genDocx">Generovat DOCX</button></div>
-  <p id="status"></p>  <script>
+  <p id="status"></p>
+
+  <script>
   // Constants
   const FACTOR_OPTIONS=["Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach","Chemické látky a směsi","------------------","Biologické činitele","Činnosti epidemiologicky závažné","Elektrotechnik dle vyhl č.50 / 1978 Sb.","Neionizující záření","Obsluha tlakových nádob a zařízení vys. napětí","Obsluha transport. a vysokozdvižných vozíků","Obsluha transport. vytáhů a jeřábů a vázaní břemen","Práce v noci","Práce ve výškách a nad volnou hloubkou","Psychická zátěž","Řidič do 7,5 tuny","Řidič nad 7,5 tuny","Vyšetření v základním rozsahu","Zátež teplem","Zraková zátěž"];
   const CATEGORY_OPTIONS=["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
@@ -128,9 +131,16 @@
     try{
       const data=tplArrayBuffer instanceof ArrayBuffer? new Uint8Array(tplArrayBuffer): tplArrayBuffer;
       const zip=new PizZip(data);
-      const DocxT=window.Docxtemplater || window.docxtemplater;
-      if(!DocxT) throw new Error('No constructor');
-      doc=new DocxT(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
+      // detekce konstruktoru Docxtemplater podle CDN
+    let DocxT;
+    if (window.docxtemplater) {
+      DocxT = window.docxtemplater.default || window.docxtemplater;
+    }
+    if (!DocxT && window.Docxtemplater) {
+      DocxT = window.Docxtemplater;
+    }
+    if (!DocxT) throw new Error('Docxtemplater konstruktor nelze najít');
+    doc = new DocxT(zip, {paragraphLoop:true,linebreaks:true,nullGetter:()=>''});(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
     }catch(e){ console.error(e); status('Chyba šablony', true); alert('Šablonu nelze načíst'); return; }
     const ctx={
       jmeno:document.getElementById('jmeno').value,
@@ -150,5 +160,6 @@
     catch(e){ console.error(e); status('Chyba stah.', true); alert('Nelze stáhnout'); }
   }
   document.getElementById('genDocx').addEventListener('click', generateDocx);
-  </script></body>
+  </script>
+</body>
 </html>

@@ -18,7 +18,6 @@
     #status{margin-top:14px;font-size:14px;min-height:18px}
   </style>
 
-  <!-- PizZip, FileSaver a PDF.js z jsdelivr -->
   <script defer src="https://cdn.jsdelivr.net/npm/pizzip@3.1.1/dist/pizzip.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -49,11 +48,9 @@
 
   <script>
   document.addEventListener('DOMContentLoaded', () => {
-    // PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
-    // helpery
     const $ = id => document.getElementById(id);
     const statusEl = $('status');
     const msg = (t, err=false) => {
@@ -61,7 +58,6 @@
       statusEl.style.color = err ? '#b00' : '#006400';
     };
 
-    // data z původní aplikace
     const FACTOR = [
       "Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
       "Chemické látky a směsi","------------------","Biologické činitele",
@@ -91,24 +87,18 @@
       "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
       "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
       "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
-      "Uklízečka":"Úklid areálu.",
-      "Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
-      "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
-      "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
+      "Uklízečka":"Úklid areálu.","Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+      "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.","Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
     };
 
-    // helper pro naplnění <select>
     const fill = (sel, arr) => {
       sel.innerHTML = '';
       arr.forEach(v => sel.add(new Option(v, v)));
     };
-
-    // naplnit dropdowny
     fill($('pobocka'), BRANCH_LIST);
     fill($('konzultant'), CONSULT_LIST);
     fill($('pozice_popis'), Object.keys(POS_DESC));
 
-    // přidat 6 faktorů
     for (let i = 1; i <= 6; i++) {
       const row = document.createElement('div');
       row.className = 'row';
@@ -126,7 +116,6 @@
       $('factors').append(row);
     }
 
-    // drag & drop + click
     const dz = $('dropZone'), fi = $('fileInput');
     dz.addEventListener('click', () => fi.click());
     ['dragenter','dragover'].forEach(ev =>
@@ -143,7 +132,6 @@
       if (e.target.files[0]) handlePDF(e.target.files[0]);
     });
 
-    // parsování PDF
     async function handlePDF(file) {
       msg('Čtu PDF…');
       $('genDocx').disabled = true;
@@ -152,7 +140,7 @@
         const pdf = await pdfjsLib.getDocument({ data }).promise;
         const page = await pdf.getPage(1);
         const ann = await page.getAnnotations({ intent:'display' });
-        const get = name => ann.find(a=>a.fieldName?.trim()===name)?.fieldValue || '';
+        const get = name => ann.find(a => a.fieldName?.trim() === name)?.fieldValue || '';
         $('jmeno').value = get('jmeno');
         $('narozeni').value = (get('narozeni')||'').split('/')[0].trim();
         $('adresa').value = [get('trvale-bydliste-ulice'), get('trvale-bydliste-mesto')]
@@ -166,20 +154,17 @@
       }
     }
 
-    // načíst šablonu
     let tplBuf = null;
     fetch('LP_template.docx')
       .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
       .then(b => { tplBuf = b; msg('Šablona načtena'); })
       .catch(() => msg('Šablonu LP_template.docx nelze načíst', true));
 
-    // XML escape
     const esc = s => s.replace(/&/g,'&amp;')
                      .replace(/</g,'&lt;')
                      .replace(/>/g,'&gt;')
                      .replace(/"/g,'&quot;');
 
-    // generovat DOCX
     $('genDocx').addEventListener('click', () => {
       if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
       msg('Generuji…');
@@ -197,13 +182,15 @@
         popis_pozice:POS_DESC[$('pozice_popis').value]||'',
         datum:new Date().toLocaleDateString('cs-CZ')
       };
-      for (let i=1; i<=6; i++) {
-        ctx[`faktor${i}`] = $(`faktor${i}`).value;
-        ctx[`kategorie${i}`] = $(`kategorie${i}`).value;
-      }
       Object.entries(ctx).forEach(([k,v]) => {
-        xml = xml.split(`{{${k}}}`).join(esc(v));
+        const re = new RegExp('\\{\\{\\s*'+k+'\\s*\\}\\}', 'g');
+        xml = xml.replace(re, esc(v));
       });
+      for (let i = 1; i <= 6; i++) {
+        const fk = 'faktor'+i, kk = 'kategorie'+i;
+        xml = xml.replace(new RegExp('\\{\\{\\s*'+fk+'\\s*\\}\\}','g'), esc($(fk).value));
+        xml = xml.replace(new RegExp('\\{\\{\\s*'+kk+'\\s*\\}\\}','g'), esc($(kk).value));
+      }
       zip.file('word/document.xml', xml);
       const blob = zip.generate({
         type:'blob',

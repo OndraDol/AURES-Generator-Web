@@ -1,20 +1,21 @@
-<!DOCTYPE html>
-<html lang="cs">
+<!DOCTYPE html><html lang="cs">
 <head>
   <meta charset="utf-8">
   <title>AURES Generátor LP</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
-    h1{font-size:26px;margin-bottom:20px}
-    h3{margin-top:30px}
+    body{font-family:Arial,Helvetica,sans-serif;background:#ffffff;margin:0;padding:20px;color:#222}
+    h1{font-size:26px;margin-bottom:20px;color:#0096FF}
+    h3{margin-top:30px;color:#0096FF}
     .row{display:flex;gap:12px;margin-bottom:12px;align-items:center}
     label{width:140px;font-weight:600}
-    input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px}
-    button{padding:10px 18px;background:#007ACC;color:#fff;border:none;border-radius:4px;cursor:pointer}
+    input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px;transition:border-color 0.3s}
+    input:focus, select:focus{border-color:#0096FF;outline:none}
+    button{padding:10px 18px;background:#0096FF;color:#fff;border:none;border-radius:4px;cursor:pointer;transition:background 0.3s}
+    button:hover:not(:disabled){background:#007ACC}
     button:disabled{background:#ccc;cursor:not-allowed}
-    #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin:20px 0;border-radius:6px;background:#fff;cursor:pointer}
-    #dropZone.drag{border-color:#007ACC;background:#eef6ff}
+    #dropZone{border:2px dashed #0096FF;padding:20px;text-align:center;margin:20px 0;border-radius:6px;background:#f0f8ff;cursor:pointer;transition:background 0.3s,border-color 0.3s}
+    #dropZone.drag{border-color:#007ACC;background:#e0f0ff}
     #status{margin-top:14px;font-size:14px;min-height:18px}
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/pizzip@3.1.1/dist/pizzip.min.js"></script>
@@ -23,30 +24,18 @@
   <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
-  <h1>AURES Generátor LP</h1>
-
-  <div id="dropZone">
+  <h1>AURES Generátor LP</h1>  <div id="dropZone">
     Přetáhni PDF sem nebo klikni
     <input type="file" id="fileInput" accept="application/pdf" hidden>
-  </div>
-
-  <div class="row"><label>Jméno</label><input id="jmeno"></div>
+  </div>  <div class="row"><label>Jméno</label><input id="jmeno"></div>
   <div class="row"><label>Datum narození</label><input id="narozeni"></div>
   <div class="row"><label>Adresa</label><input id="adresa"></div>
-  <div class="row"><label>PSČ</label><input id="psc"></div>
-
-  <h3>Faktory a kategorie</h3>
-  <div id="factors"></div>
-
-  <div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
+  <div class="row"><label>PSČ</label><input id="psc"></div>  <h3>Faktory a kategorie</h3>
+  <div id="factors"></div>  <div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
   <div class="row"><label>Pozice</label><input id="pozice" value="Prodejce"></div>
   <div class="row"><label>Konzultant</label><select id="konzultant"></select></div>
-  <div class="row"><label>Popis pozice</label><select id="pozice_popis"></select></div>
-
-  <div class="row"><button id="genDocx" disabled>Generovat DOCX</button></div>
-  <p id="status"></p>
-
-  <script>
+  <div class="row"><label>Popis pozice</label><select id="pozice_popis"></select></div>  <div class="row"><button id="genDocx" disabled>Generovat DOCX</button></div>
+  <p id="status"></p>  <script>
   document.addEventListener('DOMContentLoaded', () => {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -81,16 +70,16 @@
       "Ondřej Dolejš"
     ];
     const POS_DESC = {
-      "Call Centrum": "Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
-      "Manažer/Zástupce manažera": "Vedení týmu, administrativa, řízení služebního auta.",
-      "Prodejce": "Jednání s klienty, PC, řízení auta, částečně venku.",
-      "Nákupčí / Testovací technik": "Administrativa + testování vozů, řízení auta.",
-      "Výpomoc při přípravě vozů k prodeji": "Mytí a čištění vozů venku. Bez řízení auta.",
-      "Mechanik": "Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
-      "Uklízečka": "Úklid areálu.",
-      "Stock kontrolor": "Kontrola vozového parku, převoz vozů v areálu.",
-      "Řidič do 7,5t/ Kurýr": "Přeprava zákazníků a vozidel.",
-      "Řidič nad 7,5t": "Přeprava vozů mezi pobočkami"
+      "Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
+      "Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.",
+      "Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.",
+      "Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.",
+      "Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.",
+      "Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
+      "Uklízečka":"Úklid areálu.",
+      "Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.",
+      "Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.",
+      "Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"
     };
 
     function fill(sel, arr) {
@@ -145,8 +134,8 @@
         const get = name => ann.find(a => a.fieldName?.trim() === name)?.fieldValue || '';
         $('jmeno').value    = get('jmeno');
         $('narozeni').value = (get('narozeni')||'').split('/')[0].trim();
-        $('adresa').value   = [get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')]
-                                .filter(Boolean).join(', ');
+        $('adresa').value   = [get('trvale-bydliste-ulice'), get('trvale-bydliste-mesto')]
+                              .filter(Boolean).join(', ');
         $('psc').value      = get('trvale-bydliste-psc');
         msg('PDF načteno');
         $('genDocx').disabled = false;
@@ -163,45 +152,49 @@
       .catch(() => msg('Šablonu nelze načíst', true));
 
     $('genDocx').addEventListener('click', () => {
-      if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
-      msg('Generuji…');
+      try {
+        if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
+        msg('Generuji…');
 
-      const zip = new PizZip(tplBuf);
-      const doc = new window.Docxtemplater().loadZip(zip);
+        const zip = new PizZip(tplBuf);
+        const doc = new window.Docxtemplater().loadZip(zip);
 
-      const data = {
-        jmeno: $('jmeno').value,
-        narozeni: $('narozeni').value,
-        adresa: $('adresa').value,
-        psc: $('psc').value,
-        pobocka: $('pobocka').value,
-        pozice: $('pozice').value,
-        konzultant: $('konzultant').value,
-        pozice_popis: $('pozice_popis').value,
-        popis_pozice: POS_DESC[$('pozice_popis').value] || '',
-        datum: new Date().toLocaleDateString('cs-CZ')
-      };
-      for (let i = 1; i <= 6; i++) {
-        data['faktor'+i]    = $('faktor'+i).value;
-        data['kategorie'+i] = $('kategorie'+i).value;
+        const data = {
+          jmeno: $('jmeno').value,
+          narozeni: $('narozeni').value,
+          adresa: $('adresa').value,
+          psc: $('psc').value,
+          pobocka: $('pobocka').value,
+          pozice: $('pozice').value,
+          konzultant: $('konzultant').value,
+          pozice_popis: $('pozice_popis').value,
+          popis_pozice: POS_DESC[$('pozice_popis').value] || '',
+          datum: new Date().toLocaleDateString('cs-CZ')
+        };
+        for (let i = 1; i <= 6; i++) {
+          data['faktor'+i]    = $('faktor'+i).value;
+          data['kategorie'+i] = $('kategorie'+i).value;
+        }
+
+        doc.setData(data);
+        doc.render();
+
+        const out = doc.getZip().generate({
+          type: 'blob',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+        console.log('Generated blob:', out);
+        saveAs(out, `LP_${(data.jmeno.split(' ').pop()||'posudek')}.docx`);
+        msg('Hotovo – soubor stažen');
+      } catch (err) {
+        console.error('Generation error:', err);
+        msg('Chyba: '+ err.message, true);
+        alert('Chyba při generování: ' + err.message);
       }
-
-      doc.setData(data);
-      try { doc.render(); }
-      catch (err) {
-        console.error(err);
-        msg('Chyba při renderu šablony', true);
-        return;
-      }
-
-      const out = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
+    });
       saveAs(out, `LP_${(data.jmeno.split(' ').pop()||'posudek')}.docx`);
       msg('Hotovo – soubor stažen');
     });
   });
-  </script>
-</body>
+  </script></body>
 </html>

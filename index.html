@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <!-- Verze: 1.0.17 -->
+  <!-- Verze: 1.0.19 -->
   <title>AURES Generátor LP</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
@@ -20,17 +20,18 @@
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/pizzip@3.1.1/dist/pizzip.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <!-- import docx-templates for createReport -->
-  <script type="module">
-  import { createReport } from 'https://unpkg.com/docx-templates/lib/browser.js?module';
-  window.createReport = createReport;
-  console.log('createReport loaded:', window.createReport);
-</script>
+  <!-- load docx-templates browser build -->
+  <script defer src="https://unpkg.com/docx-templates@3.5.0/browser.js"></script>
+  <script>
+    // after load, expose createReport
+    window.createReport = window.docxTemplates && window.docxTemplates.createReport;
+    console.log('createReport ready:', window.createReport);
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
   <h1>AURES Generátor LP</h1>
-  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.18</p>
+  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.19</p>
 
   <div id="dropZone">
     Přetáhni PDF sem nebo klikni
@@ -77,7 +78,7 @@
       const sf=document.createElement('select'); sf.id='faktor'+i;
       const sk=document.createElement('select'); sk.id='kategorie'+i;
       fill(sf, FACTOR); fill(sk, CAT);
-      if(i===1){ sf.value='Vyšetření v základním rozpětí'; sk.value='Kat. 1'; }
+      if(i===1){ sf.value='Vyšetření v základním rozsahu'; sk.value='Kat. 1'; }
       row.append(sf, sk); $('factors').append(row);
     }
 
@@ -101,28 +102,22 @@
         $('adresa').value=[get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
         $('psc').value=get('trvale-bydliste-psc');
         msg('PDF načteno'); $('genDocx').disabled=false;
-      }catch(e){console.error(e);msg('Chyba při čtení PDF',true);}    }
+      }catch(e){console.error(e);msg('Chyba při čtení PDF',true);}}
 
     // generation
-    $('genDocx').addEventListener('click',()=>{
+    $('genDocx').addEventListener('click',async()=>{
       const data={ jmeno:$('jmeno').value, narozeni:$('narozeni').value, adresa:$('adresa').value, psc:$('psc').value,
         pobocka:$('pobocka').value, pozice:$('pozice').value, konzultant:$('konzultant').value,
         pozice_popis:$('pozice_popis').value, popis_pozice:POS_DESC[$('pozice_popis').value]||'', datum:new Date().toLocaleDateString('cs-CZ') };
       for(let i=1;i<=6;i++){ data['faktor'+i]=$('faktor'+i).value; data['kategorie'+i]=$('kategorie'+i).value; data['kat'+i]=data['kategorie'+i]; }
-      genDocx(data);
-    });
-
-    // call createReport polyfilled by module
-    async function genDocx(data){
-      msg('Generuji…');
       try{
+        msg('Generuji…');
         const tpl=await fetch(`LP_template.docx?cb=${Date.now()}`).then(r=>r.ok?r.arrayBuffer():Promise.reject());
         const out=await window.createReport({ template:tpl, contentControls:true, data });
         const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
         saveAs(blob,`LP_${data.jmeno.split(' ').pop()||'posudek'}.docx`);
         msg('Hotovo – soubor stažen');
-      }catch(e){console.error(e);msg('Chyba generování',true);alert('Chyba: '+e.message);}    }
-
+      }catch(e){console.error(e);msg('Chyba generování',true);alert('Chyba: '+e.message);}    });
   });
   </script>
 </body>

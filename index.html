@@ -22,14 +22,15 @@
   <script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <!-- import docx-templates for createReport -->
   <script type="module">
-    import { createReport } from 'https://unpkg.com/docx-templates/lib/browser.js';
-    window.createReport = createReport;
-  </script>
+  import { createReport } from 'https://unpkg.com/docx-templates/lib/browser.js?module';
+  window.createReport = createReport;
+  console.log('createReport loaded:', window.createReport);
+</script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
   <h1>AURES Generátor LP</h1>
-  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.17</p>
+  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.18</p>
 
   <div id="dropZone">
     Přetáhni PDF sem nebo klikni

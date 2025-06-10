@@ -2,99 +2,64 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <!-- Verze: 1.0.7 -->
-  <meta name="version" content="1.0.7">
+  <!-- Verze: 1.0.9 -->
   <title>AURES Generátor LP</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
-    h1{font-size:26px;margin-bottom:20px;color:#0096FF}
-    h3{margin-top:30px;color:#0096FF}
-    .row{display:flex;gap:12px;margin-bottom:12px;align-items:center}
-    label{width:140px;font-weight:600}
-    input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px;transition:border-color 0.3s}
-    input:focus,select:focus{border-color:#0096FF;outline:none}
-    button{padding:10px 18px;background:#0096FF;color:#fff;border:none;border-radius:4px;cursor:pointer;transition:background 0.3s}
-    button:hover:not(:disabled){background:#007ACC}
-    button:disabled{background:#ccc;cursor:not-allowed}
-    #dropZone{border:2px dashed #0096FF;padding:20px;text-align:center;margin:20px 0;border-radius:6px;background:#fff;cursor:pointer;transition:background 0.3s,border-color 0.3s}
-    #dropZone.drag{border-color:#007ACC;background:#eef6ff}
-    #status{margin-top:14px;font-size:14px;min-height:18px}
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin:0; padding:20px; color:#222; }
+    h1 { font-size:26px; margin-bottom:20px; color:#0096FF; }
+    h3 { margin-top:30px; color:#0096FF; }
+    .row { display:flex; gap:12px; margin-bottom:12px; align-items:center; }
+    label { width:140px; font-weight:600; }
+    input, select { flex:1; min-width:200px; padding:6px; border:1px solid #ccc; border-radius:4px; transition:border-color 0.3s; }
+    input:focus, select:focus { border-color:#0096FF; outline:none; }
+    button { padding:10px 18px; background:#0096FF; color:#fff; border:none; border-radius:4px; cursor:pointer; transition:background 0.3s; }
+    button:hover:not(:disabled) { background:#007ACC; }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    #dropZone { border:2px dashed #0096FF; padding:20px; text-align:center; margin:20px 0; border-radius:6px; background:#fff; cursor:pointer; transition:background 0.3s,border-color 0.3s; }
+    #dropZone.drag { border-color:#007ACC; background:#eef6ff; }
+    #status { margin-top:14px; font-size:14px; min-height:18px; }
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/pizzip@3.1.1/dist/pizzip.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/docxtemplater@3.27.0/build/docxtemplater.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
   <h1>AURES Generátor LP</h1>
-  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.7</p>
+  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.9</p>
 
-  <!-- Drop zone pro PDF -->
   <div id="dropZone">
     Přetáhni PDF sem nebo klikni
     <input type="file" id="fileInput" accept="application/pdf" hidden>
   </div>
 
-  <!-- Osobní údaje -->
-  <div class="row"><label>Jméno</label><input id="jmeno"></div>
-  <div class="row"><label>Datum narození</label><input id="narozeni"></div>
-  <div class="row"><label>Adresa</label><input id="adresa"></div>
-  <div class="row"><label>PSČ</label><input id="psc"></div>
+  <div class="row"><label for="jmeno">Jméno</label><input id="jmeno" type="text"></div>
+  <div class="row"><label for="narozeni">Datum narození</label><input id="narozeni" type="text"></div>
+  <div class="row"><label for="adresa">Adresa</label><input id="adresa" type="text"></div>
+  <div class="row"><label for="psc">PSČ</label><input id="psc" type="text"></div>
 
   <h3>Faktory a kategorie</h3>
   <div id="factors"></div>
 
-  <!-- Číselníky -->
-  <div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
-  <div class="row"><label>Pozice</label><input id="pozice" value="Prodejce"></div>
-  <div class="row"><label>Konzultant</label><select id="konzultant"></select></div>
-  <div class="row"><label>Popis pozice</label><select id="pozice_popis"></select></div>
+  <div class="row"><label for="pobocka">Pobočka</label><select id="pobocka"></select></div>
+  <div class="row"><label for="pozice">Pozice</label><input id="pozice" type="text" value="Prodejce"></div>
+  <div class="row"><label for="konzultant">Konzultant</label><select id="konzultant"></select></div>
+  <div class="row"><label for="pozice_popis">Popis pozice</label><select id="pozice_popis"></select></div>
 
-  <!-- Generační tlačítko a stav -->
   <div class="row"><button id="genDocx" disabled>Generovat DOCX</button></div>
   <p id="status"></p>
 
   <script>
   document.addEventListener('DOMContentLoaded', () => {
-    // Worker pro PDF.js
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
     const $ = id => document.getElementById(id);
-    const msg = (t, err=false) => {
-      $('status').textContent = t;
-      $('status').style.color = err ? '#b00' : '#006400';
-    };
+    const msg = (t, err=false) => { $('status').textContent = t; $('status').style.color = err ? '#b00' : '#006400'; };
 
-    // Data pro dropdowny
-    const FACTOR = ["Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach",
-      "Chemické látky a směsi","------------------","Biologické činitele",
-      "Činnosti epidemiologicky závažné","Elektrotechnik dle vyhl č.50 / 1978 Sb.",
-      "Neionizující záření","Obsluha tlakových nádob a zařízení vys. napětí",
-      "Obsluha transport. a vysokozdvižných vozíků","Obsluha transport. vytáhů a jeřábů a vázaní břemen",
-      "Práce v noci","Práce ve výškách a nad volnou hloubkou","Psychická zátěž",
-      "Řidič do 7,5 tuny","Řidič nad 7,5 tuny","Vyšetření v základním rozsahu",
-      "Zátěž teplem","Zraková zátěž"];
+    const FACTOR = ["Zátěž chladem","Fyzická zátěž","Pracovní poloha","Hluk","Vibrace","Prach","Chemické látky a směsi","------------------","Biologické činitele","Činnosti epidemiologicky závažné","Elektrotechnik dle vyhl č.50 / 1978 Sb.","Neionizující záření","Obsluha tlakových nádob a zařízení vys. napětí","Obsluha transport. a vysokozdvižných vozíků","Obsluha transport. vytáhů a jeřábů a vázaní břemen","Práce v noci","Práce ve výškách a nad volnou hloubkou","Psychická zátěž","Řidič do 7,5 tuny","Řidič nad 7,5 tuny","Vyšetření v základním rozsahu","Zátěž teplem","Zraková zátěž"];
     const CAT = ["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
-    const BRANCH = ["Brno","Chomutov","České Budějovice","Čestlice","Hradec Králové","Jihlava",
-      "Kladno","Kolín","Liberec","Mladá Boleslav","Olomouc","Opava","Ostrava",
-      "Pardubice","Plzeň","Praha","Sokolov","Tábor","Teplice","Ústí nad Labem",
-      "Valašské Mezičíčí","Zlín","Znojmo"];
-    const CONSULT = ["Anna Brůčková","Anna Kučerová","Alžběta Čermáková","Blanka Poliaková",
-      "Jan Jarma","Kamila Hušková","Karolína Kulvaitová","Miroslava Válková","Ondřej Dolejš"];
-    const POS_DESC = {
-      "Call Centrum": "Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.",
-      "Manažer/Zástupce manažera": "Vedení týmu, administrativa, řízení služebního auta.",
-      "Prodejce": "Jednání s klienty, PC, řízení auta, částečně venku.",
-      "Nákupčí / Testovací technik": "Administrativa + testování vozů, řízení auta.",
-      "Výpomoc při přípravě vozů k prodeji": "Mytí a čištění vozů venku. Bez řízení auta.",
-      "Mechanik": "Údržba a opravy vozidel, chemikálie H314. Řízení auta.",
-      "Uklízečka": "Úklid areálu.",
-      "Stock kontrolor": "Kontrola vozového parku, převoz vozů v areálu.",
-      "Řidič do 7,5t/ Kurýr": "Přeprava zákazníků a vozidel.",
-      "Řidič nad 7,5t": "Přeprava vozů mezi pobočkami"
-    };
+    const BRANCH = ["Brno","Chomutov","České Budějovice","Čestlice","Hradec Králové","Jihlava","Kladno","Kolín","Liberec","Mladá Boleslav","Olomouc","Opava","Ostrava","Pardubice","Plzeň","Praha","Sokolov","Tábor","Teplice","Ústí nad Labem","Valašské Mezičíčí","Zlín","Znojmo"];
+    const CONSULT = ["Anna Brůčková","Anna Kučerová","Alžběta Čermáková","Blanka Poliaková","Jan Jarma","Kamila Hušková","Karolína Kulvaitová","Miroslava Válková","Ondřej Dolejš"];
+    const POS_DESC = {"Call Centrum":"Činnost s klienty po telefonu, práce na PC, administrativa. Dvousměnný provoz.","Manažer/Zástupce manažera":"Vedení týmu, administrativa, řízení služebního auta.","Prodejce":"Jednání s klienty, PC, řízení auta, částečně venku.","Nákupčí / Testovací technik":"Administrativa + testování vozů, řízení auta.","Výpomoc při přípravě vozů k prodeji":"Mytí a čištění vozů venku. Bez řízení auta.","Mechanik":"Údržba a opravy vozidel, chemikálie H314. Řízení auta.","Uklízečka":"Úklid areálu.","Stock kontrolor":"Kontrola vozového parku, převoz vozů v areálu.","Řidič do 7,5t/ Kurýr":"Přeprava zákazníků a vozidel.","Řidič nad 7,5t":"Přeprava vozů mezi pobočkami"};
 
     function fill(sel, arr) {
       sel.innerHTML = '';
@@ -104,60 +69,65 @@
     fill($('konzultant'), CONSULT);
     fill($('pozice_popis'), Object.keys(POS_DESC));
 
-    // Vygenerování 6 řádků faktorů a kategorií
     for (let i = 1; i <= 6; i++) {
-      const row = document.createElement('div'); row.className = 'row';
+      const row = document.createElement('div');
+      row.className = 'row';
       const sf = document.createElement('select'); sf.id = 'faktor'+i;
       const sk = document.createElement('select'); sk.id = 'kategorie'+i;
-      fill(sf, FACTOR); fill(sk, CAT);
-      if (i === 1) { sf.value='Vyšetření v základním rozsahu'; sk.value='Kat. 1'; }
+      fill(sf, FACTOR);
+      fill(sk, CAT);
+      if (i === 1) { sf.value = 'Vyšetření v základním rozsahu'; sk.value = 'Kat. 1'; }
       row.append(sf, sk);
       $('factors').append(row);
     }
 
-    // Drag & drop + klik
     const dz = $('dropZone'), fi = $('fileInput');
-    dz.addEventListener('click', ()=>fi.click());
-    ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
-    ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('drag')));
-    dz.addEventListener('drop',e=>{e.preventDefault(); if(e.dataTransfer.files[0]) loadPDF(e.dataTransfer.files[0]); });
-    fi.addEventListener('change',e=>{ if(e.target.files[0]) loadPDF(e.target.files[0]); });
+    dz.addEventListener('click', () => fi.click());
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, () => dz.classList.remove('drag')));
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      if (e.dataTransfer.files[0]) loadPDF(e.dataTransfer.files[0]);
+    });
+    fi.addEventListener('change', e => { if (e.target.files[0]) loadPDF(e.target.files[0]); });
 
     async function loadPDF(file) {
-      msg('Čtu PDF…'); $('genDocx').disabled = true;
+      msg('Čtu PDF…');
+      $('genDocx').disabled = true;
       try {
         const data = new Uint8Array(await file.arrayBuffer());
-        const pdf = await pdfjsLib.getDocument({data}).promise;
+        const pdf = await pdfjsLib.getDocument({ data }).promise;
         const page = await pdf.getPage(1);
-        const ann = await page.getAnnotations({intent:'display'});
-        const get = name=>ann.find(a=>a.fieldName?.trim()===name)?.fieldValue||'';
+        const ann  = await page.getAnnotations({ intent:'display' });
+        const get  = name => ann.find(a => a.fieldName?.trim() === name)?.fieldValue || '';
         $('jmeno').value    = get('jmeno');
         $('narozeni').value = (get('narozeni')||'').split('/')[0].trim();
-        $('adresa').value   = [get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
+        $('adresa').value   = [ get('trvale-bydliste-ulice'), get('trvale-bydliste-mesto') ]
+                               .filter(Boolean).join(', ');
         $('psc').value      = get('trvale-bydliste-psc');
-        msg('PDF načteno'); $('genDocx').disabled = false;
-      } catch(e) { console.error(e); msg('Chyba při čtení PDF', true); }
+        msg('PDF načteno');
+        $('genDocx').disabled = false;
+      } catch (e) {
+        console.error(e);
+        msg('Chyba při čtení PDF', true);
+      }
     }
 
-    // Načtení šablony + cache-bust
     let tplBuf = null;
     fetch(`LP_template.docx?cb=${Date.now()}`)
-      .then(r=>r.ok?r.arrayBuffer():Promise.reject())
-      .then(b=>{ tplBuf = b; msg('Šablona načtena'); })
-      .catch(()=>msg('Šablonu nelze načíst', true));
+      .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+      .then(b => { tplBuf = b; msg('Šablona načtena'); })
+      .catch(() => msg('Šablonu nelze načíst', true));
 
-    // Klik na generování
-    $('genDocx').addEventListener('click', ()=>{
+    $('genDocx').addEventListener('click', () => {
       try {
         if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
         msg('Generuji…');
         const zip = new PizZip(tplBuf);
-        // Podpora module import vs global
-        const DocxTpl = window.docxtemplater?.default || window.docxtemplater || window.Docxtemplater;
-        if (!DocxTpl) throw new Error('Docxtemplater constructor not found');
-        const doc = new DocxTpl(zip);
-        // Příprava dat
-        const data = {
+        let xml = zip.file('word/document.xml').asText();
+        xml = xml.replace(/<\/w:r>\s*<w:r[^>]*>/g, '');
+        xml = xml.replace(/<\/w:t>\s*<w:t[^>]*>/g, '');
+        const ctx = {
           jmeno: $('jmeno').value,
           narozeni: $('narozeni').value,
           adresa: $('adresa').value,
@@ -166,34 +136,24 @@
           pozice: $('pozice').value,
           konzultant: $('konzultant').value,
           pozice_popis: $('pozice_popis').value,
-          popis_pozice: POS_DESC[$('pozice_popis').value]||'',
+          popis_pozice: POS_DESC[$('pozice_popis').value] || '',
           datum: new Date().toLocaleDateString('cs-CZ')
         };
-        for (let i=1; i<=6; i++) {
-          data['faktor'+i]    = $('faktor'+i).value;
-          data['kategorie'+i] = $('kategorie'+i).value;
-        }
-        // Render + blob
-        doc.setData(data);
-        doc.render();
-        const out = doc.getZip().generate({
-          type:'blob',
-          mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        Object.entries(ctx).forEach(([k,v]) => {
+          xml = xml.replace(new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'g'), v);
         });
-        console.log('Generated blob', out);
-        saveAs(out, `LP_${(data.jmeno.split(' ').pop()||'posudek')}.docx`);
-        msg('Hotovo – soubor stažen');
-      } catch(err) {
-        // Zpracování vícenásobných chyb z Docxtemplater
-        console.error('Generation error:', err);
-        if (err.properties && Array.isArray(err.properties.errors)) {
-          err.properties.errors.forEach(e => console.error(e));
-          alert('Chyby šablony:\n' +
-            err.properties.errors.map(e=>e.properties.explanation||e.message).join('\n'));
-        } else {
-          msg('Chyba: ' + err.message, true);
-          alert('Chyba při generování: ' + err.message);
+        for (let i=1; i<=6; i++) {
+          xml = xml.replace(new RegExp(`\\{\\{\\s*faktor${i}\\s*\\}\\}`, 'g'), $('faktor'+i).value);
+          xml = xml.replace(new RegExp(`\\{\\{\\s*kategorie${i}\\s*\\}\\}`, 'g'), $('kategorie'+i).value);
         }
+        zip.file('word/document.xml', xml);
+        const out = zip.generate({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        saveAs(out, `LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);
+        msg('Hotovo – soubor stažen');
+      } catch (e) {
+        console.error('Generation error:', e);
+        msg('Chyba generování', true);
+        alert('Chyba: '+ e.message);
       }
     });
   });

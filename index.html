@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="cs">
+<!DOCTYPE html>
+<html lang="cs">
 <head>
   <meta charset="utf-8">
   <!-- Verze: 1.0.7 -->
@@ -27,18 +28,34 @@
 </head>
 <body>
   <h1>AURES Generátor LP</h1>
-  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.7</p>  <!-- Drop zone pro PDF -->  <div id="dropZone">
+  <p style="text-align:right;color:#007ACC;font-size:0.9rem;">Verze 1.0.7</p>
+
+  <!-- Drop zone pro PDF -->
+  <div id="dropZone">
     Přetáhni PDF sem nebo klikni
     <input type="file" id="fileInput" accept="application/pdf" hidden>
-  </div>  <!-- Osobní údaje -->  <div class="row"><label>Jméno</label><input id="jmeno"></div>
+  </div>
+
+  <!-- Osobní údaje -->
+  <div class="row"><label>Jméno</label><input id="jmeno"></div>
   <div class="row"><label>Datum narození</label><input id="narozeni"></div>
   <div class="row"><label>Adresa</label><input id="adresa"></div>
-  <div class="row"><label>PSČ</label><input id="psc"></div>  <h3>Faktory a kategorie</h3>
-  <div id="factors"></div>  <!-- Číselníky -->  <div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
+  <div class="row"><label>PSČ</label><input id="psc"></div>
+
+  <h3>Faktory a kategorie</h3>
+  <div id="factors"></div>
+
+  <!-- Číselníky -->
+  <div class="row"><label>Pobočka</label><select id="pobocka"></select></div>
   <div class="row"><label>Pozice</label><input id="pozice" value="Prodejce"></div>
   <div class="row"><label>Konzultant</label><select id="konzultant"></select></div>
-  <div class="row"><label>Popis pozice</label><select id="pozice_popis"></select></div>  <!-- Generační tlačítko a stav -->  <div class="row"><button id="genDocx" disabled>Generovat DOCX</button></div>
-  <p id="status"></p>  <script>
+  <div class="row"><label>Popis pozice</label><select id="pozice_popis"></select></div>
+
+  <!-- Generační tlačítko a stav -->
+  <div class="row"><button id="genDocx" disabled>Generovat DOCX</button></div>
+  <p id="status"></p>
+
+  <script>
   document.addEventListener('DOMContentLoaded', () => {
     // Worker pro PDF.js
     pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -180,5 +197,6 @@
       }
     });
   });
-  </script></body>
+  </script>
+</body>
 </html>

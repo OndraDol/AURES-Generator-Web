@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <title>AURES Generátor LP v3</title>
+  <title>AURES Generátor LP v4</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" href="data:,">
   <style>
@@ -139,8 +139,16 @@ window.addEventListener('DOMContentLoaded', () => {
   fetch('LP_template.docx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>{tplBuf=b;msg('Šablona načtena');}).catch(()=>msg('Šablonu LP_template.docx nelze načíst',true));
 
   const esc = s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // náhrada placeholderu uvnitř XML (funguje i na {{tag}})
   const replaceVar = (xml,key,val)=>{
     const safe = esc(val);
+    // 1) placeholder uvnitř jednoho <w:t>
+    const reRun = new RegExp(`(<w:t[^>]*>)\s*${key}\s*(</w:t>)`,'gi');
+    xml = xml.replace(reRun, `$1${safe}$2`);
+    // 2) fallback: prostý {{tag}} kdekoli v dokumentu
+    const reCurly = new RegExp(`\{\{\s*${key}\s*\}\}`,'gi');
+    return xml.replace(reCurly, safe);
+  };
     // nahraď uvnitř <w:t>... bez ohledu na velikost písmen
     const re = new RegExp(`(<w:t[^>]*>)\s*${key}\s*(</w:t>)`,'gi');
     return xml.replace(re, `$1${safe}$2`);

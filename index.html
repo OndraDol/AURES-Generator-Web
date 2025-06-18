@@ -1,122 +1,8 @@
-## 1. Celkový cíl(e)
-Vytvořit čistě statickou webovou stránku, která:
-
-- Načte osobní PDF (AcroForm nebo text) bez backendu.
-- Vyparsuje z něj data (jméno, datum narození, adresa, PSČ).
-- Nabídne uživateli výběr z číselníků (faktory, kategorie, pobočka, konzultant, popis pozice) podle desktopové aplikace AURES.
-- Vloží všechna data do šablony Word (DOCX) a umožní její stažení.
-
----
-
-## 2. Klíčová témata a podtémata
-- **PDF parsing**  
-  - pdf-lib + AcroForm (první pokus)  
-  - Fallback pdf.js + `getAnnotations({intent:'display'})`
-- **Generování DOCX**  
-  - Původně Docxtemplater + PizZip → CORS/MIME problémy  
-  - Finálně ruční nahrazování tagů `{{…}}` v `word/document.xml` pomocí PizZip + FileSaver
-- **Statické hostování**  
-  - Jediný `index.html`  
-  - Hostování na GitHub Pages / Sites.Google
-- **Debugging**  
-  - CORS / MIME errors pro CDN knihovny  
-  - Problémy s načtením `window.Docxtemplater`  
-  - Chyby `Cannot set properties of undefined` při stavu
-
----
-
-## 3. Zavedené preference a pokyny
-- **Jazyk a tón**: jednoduchý česky, krátké věty, žádné AI-klišé, neformální styl  
-- **Stručnost**: vynechat zbytečná slova a „vatu“  
-- **Formátování**: čisté HTML + Vanilla JS v jednom souboru  
-- **Knihovny**: jen PizZip, FileSaver.js, pdf.js (z jsDelivr)  
-- **Bez backendu**: úplně statické
-
----
-
-## 4. Zmíněný klíčový uživatelský kontext
-- Ondra, HR Business Partner, potřebuje nahradit desktopovou Python aplikaci webovou verzí.  
-- Web nasazen na firemní GitHub Pages nebo Sites.Google bez serveru.
-
----
-
-## 5. Chronologický průběh/vývoj
-1. Uživatelská Python aplikace + šablona `LP_template.docx`.  
-2. První `index.html` s Docxtemplater → chybové hlášky (`No constructor`, CORS).  
-3. Řada iterací: různé CDN, fallback výběru šablony, debug `status`.  
-4. Kompletní překopání na ruční XML-replace → proměnné se zatím nenahrazují.  
-5. Finalizace: PDF parsing OK, dropdowny pobočka/konzultant OK, ale DOCX stále bez nahrazených polí.
-
----
-
-## 6. Zásadní informace a data
-- **Pole v PDF**:  
-  - `jmeno`, `narozeni`, `trvale-bydliste-ulice`, `trvale-bydliste-mesto`, `trvale-bydliste-psc`
-- **Seznamy**:  
-  - **Faktory** (23 položek, viz kód)  
-  - **Kategorie**: `["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"]`  
-  - **Pobočky** (22 míst: Brno, Praha, …, Znojmo)  
-  - **Konzultanti** (9 jmen: Anna Brůčková, …, Ondřej Dolejš)  
-  - **Popisy pozic** (10 typů, viz `POS_DESC`)
-- **Knihovny a verze**:  
-  - PizZip 3.1.1, FileSaver 2.0.5, pdf.js 3.11.174 
-- **Soubor**: `LP_template.docx` v kořeni
-
----
-
-## 7. Úryvky kódu a výstupy
-### Parsování PDF (pdf.js)
-```js
-const ann = await page.getAnnotations({ intent:'display' });
-const get = name => ann.find(a=>a.fieldName?.trim()===name)?.fieldValue || '';
-jmeno.value   = get('jmeno');
-narozeni.value= get('narozeni').split('/')[0];
-Nahrazování tagů v DOCX
-js
-Copy
-Edit
-let xml = zip.file('word/document.xml').asText();
-Object.entries(ctx).forEach(([k,v]) => {
-  xml = xml.replace(new RegExp(`{{\\s*${k}\\s*}}`, 'g'), esc(v));
-});
-zip.file('word/document.xml', xml);
-8. Rozhodnutí a dohody
-Odstoupit od Docxtemplateru kvůli CORS/MIME chybám.
-
-Použít ruční metodu s PizZip + FileSaver.
-
-Dropdowny plněny daty z desktopové aplikace.
-
-9. Akční položky a další kroky
-Implementovat skutečné nahrazení všech {{…}} tagů (ještě nefunguje).
-
-Otestovat výstupní DOCX s reálnými daty.
-
-Nasazení na produkční hosting (GitHub Pages / Sites.Google).
-
-10. Nevyřešené body a otevřené otázky
-Proměnné v DOCX zatím zůstávají ve formě {{jmeno}} apod.
-
-Potřebujeme doladit regex pro nahrazení (momentálně neprobíhá).
-
-Ověřit, že POS_DESC odpovídá finálním textům.
-
-11. Aktuální stav / Poslední interakce
-PDF se úspěšně parsuje.
-
-Dropdowny pobočka a konzultant naplněny reálnými hodnotami.
-
-Následující krok: opravit část generování DOCX tak, aby se data skutečně nahradila ve výsledné šabloně.
-
-Kompletní kód index.html
-html
-Copy
-Edit
 <!DOCTYPE html>
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <title>AURES Generátor LP</title>
+  <title>AURES Generátor LP v2</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" href="data:,">
   <style>
@@ -162,6 +48,7 @@ Edit
 
   <script>
   document.addEventListener('DOMContentLoaded', () => {
+    // ---------- PDF.js nastavení ----------
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
@@ -170,9 +57,11 @@ Edit
     const msg = (t, err=false) => {
       statusEl.textContent = t;
       statusEl.style.color = err ? '#b00' : '#006400';
+      console.log(t);
     };
 
-    const FACTOR = [ /* seznam 23 faktorů */ ];
+    // ---------- Číselníky ----------
+    const FACTOR = [ /* 23 faktorů */ ];
     const CAT = ["","Kat. 1","Kat. 2","Kat. 3","Kat. 4"];
     const BRANCH_LIST = [ /* 22 poboček */ ];
     const CONSULT_LIST = [ /* 9 konzultantů */ ];
@@ -183,6 +72,7 @@ Edit
     fill($('konzultant'), CONSULT_LIST);
     fill($('pozice_popis'), Object.keys(POS_DESC));
 
+    // faktory + kategorie selecty
     for (let i = 1; i <= 6; i++) {
       const row = document.createElement('div'); row.className='row';
       const sf = document.createElement('select'); sf.id='faktor'+i;
@@ -192,6 +82,7 @@ Edit
       row.append(sf, sk); $('factors').append(row);
     }
 
+    // ---------- Drag & drop PDF ----------
     const dz = $('dropZone'), fi = $('fileInput');
     dz.onclick = () => fi.click();
     ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
@@ -217,35 +108,63 @@ Edit
       }
     }
 
+    // ---------- Načtení DOCX šablony ----------
     let tplBuf=null;
     fetch('LP_template.docx')
       .then(r=>r.ok? r.arrayBuffer():Promise.reject())
       .then(b=>{tplBuf=b;msg('Šablona načtena');})
       .catch(()=>msg('Šablonu LP_template.docx nelze načíst',true));
 
+    // ---------- Pomocné funkce ----------
     const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
+    // nahrazení obsahu <w:t>…</w:t>
+    const replaceVar = (xml,key,val) => {
+      const safe = esc(val);
+      const re = new RegExp(`(<w:t[^>]*>)\\s*${key}\\s*(</w:t>)`,'g');
+      return xml.replace(re, `$1${safe}$2`);
+    };
+
+    // odstranění w:placeholder (aby Word neukazoval šedý hint místo textu)
+    const stripPlaceholders = xml => xml
+      .replace(/<w:placeholder[\s\S]*?<\/w:placeholder>/g,'')
+      .replace(/<w:placeholder[^>]*?\/>/g,'');
+
+    // ---------- Generování DOCX ----------
     $('genDocx').addEventListener('click', () => {
       if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
+
       msg('Generuji…');
       const zip = new PizZip(new Uint8Array(tplBuf));
       let xml = zip.file('word/document.xml').asText();
+
+      // Kontext pro nahrazení
       const ctx = {
-        jmeno:$('jmeno').value, narozeni:$('narozeni').value,
-        adresa:$('adresa').value, psc:$('psc').value,
-        pobocka:$('pobocka').value, pozice:$('pozice').value,
+        jmeno:$('jmeno').value,
+        narozeni:$('narozeni').value,
+        adresa:$('adresa').value,
+        psc:$('psc').value,
+        pozice:$('pozice').value,
         konzultant:$('konzultant').value,
         pozice_popis:$('pozice_popis').value,
         popis_pozice:POS_DESC[$('pozice_popis').value]||'',
+        pobocka:$('pobocka').value,
         datum:new Date().toLocaleDateString('cs-CZ')
       };
-      Object.entries(ctx).forEach(([k,v]) => {
-        xml = xml.replace(new RegExp(`{{\\s*${k}\\s*}}`,`g`), esc(v));
-      });
-      for (let i=1;i<=6;i++){
-        xml = xml.replace(new RegExp(`{{\\s*faktor${i}\\s*}}`,`g`), esc($('faktor'+i).value));
-        xml = xml.replace(new RegExp(`{{\\s*kategorie${i}\\s*}}`,`g`), esc($('kategorie'+i).value));
+
+      // Statické položky
+      Object.entries(ctx).forEach(([k,v])=>{ xml = replaceVar(xml,k,v); });
+
+      // Faktory + kategorie
+      for (let i=1;i<=6;i++) {
+        xml = replaceVar(xml,`faktor${i}`,$('faktor'+i).value);
+        xml = replaceVar(xml,`kat${i}`,$('kategorie'+i).value);
       }
+
+      // Odstraníme placeholdery, ať Word neignoruje obsah
+      xml = stripPlaceholders(xml);
+
+      // Zapíšeme zpět a stáhneme
       zip.file('word/document.xml', xml);
       const blob = zip.generate({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
       saveAs(blob, `LP_${(ctx.jmeno.split(' ').pop()||'posudek')}.docx`);

@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<title>AURES Generátor LP11</title>
+<title>AURES Generátor LP12</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
@@ -98,13 +98,12 @@ const POS_DESC={
   'Výpomoc při prodeji vozů':'Jednání s klienty, PC, střídání teplo/chlad (DPP).'
 };
 
-/* ---------- 4) naplnění selectů ---------- */
+/* ---------- 4) selecty ---------- */
 const fill=(sel,arr)=>{sel.innerHTML='';arr.forEach(v=>sel.add(new Option(v,v)));};
 fill($('pobocka'),BRANCH);
 fill($('konzultant'),CONSULT);
 fill($('pozice_popis'),Object.keys(POS_DESC));
 
-/* faktory + kategorie */
 for(let i=1;i<=6;i++){
   const row=document.createElement('div');row.className='row';
   const sf=document.createElement('select');sf.id='faktor'+i;fill(sf,FACTOR);
@@ -140,7 +139,7 @@ async function loadPDF(file){
   }catch(e){console.error(e);msg('Chyba při čtení PDF',true);}
 }
 
-/* ---------- 7) načtení šablony ---------- */
+/* ---------- 7) šablona ---------- */
 let templateBuf=null;
 fetch('LP_template.docx')
   .then(r=>r.ok?r.arrayBuffer():Promise.reject())
@@ -150,14 +149,20 @@ fetch('LP_template.docx')
 /* ---------- 8) generování DOCX ---------- */
 $('genDocx').addEventListener('click',()=>{
   if(!templateBuf){alert('Šablona chybí');return;}
-
   msg('Generuji…');
   try{
     const zip=new PizZip(templateBuf);
-    /* Docxtemplater konstruktor – knihovna exportuje funkci na window.Docxtemplater */
-    let doc=new window.Docxtemplater().loadZip(zip);
 
-    /* data z formuláře */
+    /* detekce správného konstruktoru */
+    let DocxCtor =
+      window.docxtemplater?.DocxTemplater ||
+      (typeof window.docxtemplater==='function' ? window.docxtemplater : null) ||
+      window.DocxTemplater ||
+      window.Docxtemplater;
+    if(!DocxCtor) throw new Error('Docxtemplater nebyl nalezen');
+
+    let doc=new DocxCtor(zip,{paragraphLoop:true,linebreaks:true});
+
     const data={
       jmeno:$('jmeno').value.trim(),
       narozeni:$('narozeni').value.trim(),
@@ -175,19 +180,12 @@ $('genDocx').addEventListener('click',()=>{
       data['kategorie'+i]=$('kategorie'+i).value;
     }
 
-    /* 1. pokus o render */
+    /* doplň chybějící tagy */
+    const allTags=Object.keys(doc.getTags ? doc.getTags() : {});
+    allTags.forEach(tag=>{if(data[tag]===undefined) data[tag]='';});
+
     doc.setData(data);
-    try{
-      doc.render();
-    }catch(err){
-      /* pokud chybí tagy, doplníme prázdný string a zkusíme znovu */
-      if(err.properties && err.properties.errors){
-        err.properties.errors.forEach(e=>{data[e.properties.tag]='';});
-        doc=new window.Docxtemplater().loadZip(zip);
-        doc.setData(data);
-        doc.render();
-      }else throw err;
-    }
+    doc.render();
 
     const out=doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
     saveAs(out,'LP_'+data.jmeno.replace(/\s+/g,'_')+'.docx');

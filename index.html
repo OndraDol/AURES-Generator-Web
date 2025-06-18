@@ -2,19 +2,19 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<title>AURES Generátor LP</title>
+<title>AURES Generátor LP14</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
-  h1{font-size:26px;margin-bottom:20px}
-  .row{display:flex;gap:12px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
-  label{width:140px;font-weight:600}
-  input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px}
-  button{padding:10px 18px;background:#007ACC;color:#fff;border:none;border-radius:4px;cursor:pointer}
-  button:disabled{background:#ccc;cursor:not-allowed}
-  #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin:20px 0;border-radius:6px;background:#fff;cursor:pointer}
-  #dropZone.drag{border-color:#007ACC;background:#eef6ff}
-  #status{margin-top:14px;font-size:14px;min-height:18px}
+ body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:20px;color:#222}
+ h1{font-size:26px;margin:0 0 20px}
+ .row{display:flex;gap:12px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+ label{width:140px;font-weight:600}
+ input,select{flex:1;min-width:200px;padding:6px;border:1px solid #ccc;border-radius:4px}
+ button{padding:10px 18px;background:#007ACC;color:#fff;border:none;border-radius:4px;cursor:pointer}
+ button:disabled{background:#ccc;cursor:not-allowed}
+ #dropZone{border:2px dashed #888;padding:20px;text-align:center;margin:20px 0;border-radius:6px;background:#fff;cursor:pointer;transition:.2s}
+ #dropZone.drag{border-color:#007ACC;background:#eef6ff}
+ #status{margin-top:14px;font-size:14px;min-height:18px}
 </style>
 
 <!-- knihovny -->
@@ -48,70 +48,102 @@
 <p id="status"></p>
 
 <script>
-/* ------------ util ------------ */
+/* ===== 1) util  ===== */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 const $=id=>document.getElementById(id);
-const msg=(t,e=false)=>{$('status').textContent=t;$('status').style.color=e?'#b00':'#006400';};
+const msg=(t,err=false)=>{$('status').textContent=t;$('status').style.color=err?'#b00':'#006400';};
 
-/* ------------ číselníky (zkrácené) ------------ */
-const FACTOR=['Vyšetření v základním rozsahu',/*…*/], CAT=['','Kat. 1','Kat. 2','Kat. 3','Kat. 4'];
-const BRANCH=['Brno','Praha',/*…*/], CONSULT=['Anna Brůčková','Ondřej Dolejš',/*…*/];
-const POS_DESC={'Prodejce':'Jednání s klienty …',/*…*/};
+/* ===== 2) číselníky (zkrácené) ===== */
+const FACTOR=['Vyšetření v základním rozsahu',/* …dalších 22 faktorů … */];
+const CAT=['','Kat. 1','Kat. 2','Kat. 3','Kat. 4'];
+const BRANCH=['Brno','Praha',/* … */];
+const CONSULT=['Anna Brůčková','Ondřej Dolejš',/* … */];
+const POS_DESC={'Prodejce':'Jednání s klienty…',/* … */};
 
 /* selecty */
 const fill=(s,a)=>{s.innerHTML='';a.forEach(v=>s.add(new Option(v,v)));};
 fill($('pobocka'),BRANCH);fill($('konzultant'),CONSULT);fill($('pozice_popis'),Object.keys(POS_DESC));
-for(let i=1;i<=6;i++){const r=document.createElement('div');r.className='row';
+for(let i=1;i<=6;i++){
+  const r=document.createElement('div');r.className='row';
   const sf=document.createElement('select');sf.id='faktor'+i;fill(sf,FACTOR);
   const sk=document.createElement('select');sk.id='kategorie'+i;fill(sk,CAT);
   if(i===1){sf.value='Vyšetření v základním rozsahu';sk.value='Kat. 1';}
-  r.append(sf,sk);$('factors').append(r);}
+  r.append(sf,sk);$('factors').append(r);
+}
 
-/* drag & drop */
-const dz=$('dropZone'),fi=$('fileInput');
-dz.onclick=()=>fi.click();['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
-['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('drag')));
+/* ===== 3) drag & drop PDF ===== */
+const dz=$('dropZone'), fi=$('fileInput');
+dz.onclick=()=>fi.click();
+['dragenter','dragover'].forEach(e=>dz.addEventListener(e,e2=>{e2.preventDefault();dz.classList.add('drag');}));
+['dragleave','drop'].forEach(e=>dz.addEventListener(e,()=>dz.classList.remove('drag')));
 dz.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
 fi.addEventListener('change',e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
 
-/* PDF načtení */
-async function loadPDF(f){msg('Čtu PDF…');$('genDocx').disabled=true;
-  try{const buf=new Uint8Array(await f.arrayBuffer());
+async function loadPDF(file){
+  msg('Čtu PDF…');$('genDocx').disabled=true;
+  try{
+    const buf=new Uint8Array(await file.arrayBuffer());
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
     const ann=await (await pdf.getPage(1)).getAnnotations({intent:'display'});
-    const get=n=>ann.find(a=>a.fieldName?.trim()===n)?.fieldValue||'';
-    $('jmeno').value=get('jmeno');$('narozeni').value=(get('narozeni')||'').split('/')[0].trim();
+    const get=n=>ann.find(a=>a.fieldName?.trim().toLowerCase()===n.toLowerCase())?.fieldValue||'';
+    $('jmeno').value=get('jmeno');
+    $('narozeni').value=(get('narozeni')||'').split('/')[0].trim();
     $('adresa').value=[get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
-    $('psc').value=get('trvale-bydliste-psc');$('pozice').value=get('pozice')||$('pozice').value;
-    msg('PDF načteno');$('genDocx').disabled=false;}
-  catch(e){console.error(e);msg('Chyba při čtení PDF',true);}}
+    $('psc').value=get('trvale-bydliste-psc');
+    $('pozice').value=get('pozice')||$('pozice').value;
+    msg('PDF načteno');$('genDocx').disabled=false;
+  }catch(e){console.error(e);msg('Chyba při čtení PDF',true);}
+}
 
-/* šablona */
+/* ===== 4) načti šablonu ===== */
 let tpl=null;
 fetch('LP_template.docx').then(r=>r.ok?r.arrayBuffer():Promise.reject())
-  .then(b=>{tpl=b;msg('Šablona načtena');}).catch(()=>msg('Šablonu nelze načíst',true));
+  .then(b=>{tpl=b;msg('Šablona načtena');})
+  .catch(()=>msg('Šablonu nelze načíst',true));
 
-/* generování */
+/* ===== 5) generování ===== */
 $('genDocx').addEventListener('click',()=>{
-  if(!tpl){alert('Šablona chybí');return;} msg('Generuji…');
+  if(!tpl){alert('Šablona chybí');return;}
+  msg('Generuji…');
   try{
     const zip=new PizZip(tpl);
-    const DocxCtor=window.Docxtemplater||window.DocxTemplater;
-    const doc=new DocxCtor().loadZip(zip);
+    const Docx=window.Docxtemplater||window.DocxTemplater;
+    const doc=new Docx().loadZip(zip);
 
-    const d={jmeno:$('jmeno').value.trim(),narozeni:$('narozeni').value.trim(),adresa:$('adresa').value.trim(),
-      psc:$('psc').value.trim(),pobocka:$('pobocka').value.trim(),pozice:$('pozice').value.trim(),
-      konzultant:$('konzultant').value.trim(),pozice_popis:$('pozice_popis').value.trim(),
-      popis_pozice:POS_DESC[$('pozice_popis').value.trim()]||'',datum:new Date().toLocaleDateString('cs-CZ')};
-    for(let i=1;i<=6;i++){d['faktor'+i]=$('faktor'+i).value;d['kategorie'+i]=$('kategorie'+i).value;}
+    /* ------- data z formuláře ------- */
+    const d={
+      jmeno:$('jmeno').value.trim(),
+      narozeni:$('narozeni').value.trim(),
+      adresa:$('adresa').value.trim(),
+      psc:$('psc').value.trim(),
+      pobocka:$('pobocka').value.trim(),
+      pozice:$('pozice').value.trim(),
+      konzultant:$('konzultant').value.trim(),
+      pozice_popis:$('pozice_popis').value.trim(),
+      popis_pozice:POS_DESC[$('pozice_popis').value.trim()]||'',
+      datum:new Date().toLocaleDateString('cs-CZ')
+    };
+    for(let i=1;i<=6;i++){
+      d['faktor'+i]=$('faktor'+i).value;
+      d['kategorie'+i]=$('kategorie'+i).value;
+      d['Kat'+i]=$('kategorie'+i).value; // šablona má někde Kat1…Kat6
+    }
 
-    doc.setData(d); doc.render();
-    const out=doc.getZip().generate({type:'blob',
-      mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-    saveAs(out,'LP_'+d.jmeno.replace(/\\s+/g,'_')+'.docx');
-    msg('Hotovo – soubor stažen');}
-  catch(err){console.error(err);msg('Chyba generování',true);} });
+    /* ------- aliasy pro „narozeni 0“ apod. ------- */
+    d['narozeni 0']=d.narozeni;
+    d['narozeni0']=d.narozeni;
+
+    /* ------- render ------- */
+    doc.setData(d);
+    doc.render();
+
+    const blob=doc.getZip().generate({type:'blob',mimeType:
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    saveAs(blob,'LP_'+d.jmeno.replace(/\\s+/g,'_')+'.docx');
+    msg('Hotovo – soubor stažen');
+  }catch(err){console.error(err);msg('Chyba generování',true);}
+});
 </script>
 </body>
 </html>

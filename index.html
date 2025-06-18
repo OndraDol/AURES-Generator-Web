@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<title>AURES Generátor LP v9</title>
+<title>AURES Generátor LP v10</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
@@ -51,8 +51,8 @@
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
 
-/* ---------- 1) nastavení pdf.js ---------- */
-pdfjsLib.GlobalWorkerOptions.workerSrc=
+/* ---------- 1) pdf.js ---------- */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 /* ---------- 2) util ---------- */
@@ -79,55 +79,54 @@ const CONSULT=[
   'Kamila Hušková','Karolína Kulvaitová','Miroslava Válková','Ondřej Dolejš'
 ];
 const POS_DESC={
-  'Call Centrum':'Činnost spojená s jednáním s klienty/zaměstnanci po telefonu, prací na počítači a administrativními úkony.',
-  'Manažer/Zástupce manažera':'Administrativní činnost, vedení týmu, jednání s klienty, řízení služebního vozu.',
-  'Prodejce':'Jednání s klienty, práce na PC, střídání pobytu uvnitř/venku, řízení vozidla.',
-  'Nákupčí / Testovací technik':'Jednání s klienty, práce na PC, řízení vozidla, občas venku.',
-  'Mobilní nákupčí':'Převážně řízení vozidla (>60 %), jednání s klienty, práce na PC.',
+  'Call Centrum':'Činnost spojená s jednáním s klienty po telefonu a administrativou.',
+  'Manažer/Zástupce manažera':'Administrativa, vedení týmu, jednání s klienty.',
+  'Prodejce':'Jednání s klienty, PC práce, střídání vnitřek/venek, řízení vozidla.',
+  'Nákupčí / Testovací technik':'Jednání s klienty, PC, řízení, občas venku.',
+  'Mobilní nákupčí':'>60 % řízení, jednání s klienty, PC.',
   'Specialista zákaznického servisu':'Administrativa a komunikace s klienty.',
-  'Mobilní Specialista zákaznického servisu':'Administrativa, komunikace, řízení vozidla.',
-  'Administrativa':'Práce na PC, zakládání složek, jednání se zaměstnanci/klienty.',
-  'Operační tým/Pracovník podpory prodeje':'Mycí/dílenské práce, venkovní práce, řízení vozidla, chemikálie.',
-  'Uklízečka':'Úklidové práce, mytí, čištění, odpad.',
-  'Stock kontrolor':'Převoz aut v areálu, kontrola vozového parku, PC práce.',
-  'Řidič do 7,5t/ Kurýr':'Přeprava zákazníků a vozidel, řízení vozidla.',
-  'Řidič nad 7,5t':'Přeprava vozů mezi pobočkami, nakládka/vykládka, řízení vozidla >7,5 t.',
-  'Technik se zaměřením na opravy detailů':'Drobné opravy, řízení vozidla.',
-  'Mechanik':'Údržba, opravy a seřizování vozidel, práce s chemikáliemi.',
-  'Výpomoc při přepravě vozů mezi pobočkami':'Přeprava vozů/zákazníků, řízení vozidla (DPP).',
-  'Výpomoc při prodeji vozů':'Jednání s klienty, práce na PC, střídání teplo/chlad (DPP).'
+  'Mobilní Specialista zákaznického servisu':'Administrativa, komunikace, řízení.',
+  'Administrativa':'PC práce, jednání se zaměstnanci/klienty.',
+  'Operační tým/Pracovník podpory prodeje':'Mycí/dílenské práce, venku, řízení, chemie.',
+  'Uklízečka':'Úklid, mytí, odpad.',
+  'Stock kontrolor':'Převoz aut v areálu, kontrola vozů, PC.',
+  'Řidič do 7,5t/ Kurýr':'Přeprava zákazníků/vozidel, řízení.',
+  'Řidič nad 7,5t':'Převoz vozů mezi pobočkami, nakládka, řízení >7,5 t.',
+  'Technik se zaměřením na opravy detailů':'Drobné opravy, řízení.',
+  'Mechanik':'Údržba a opravy vozidel, chemikálie.',
+  'Výpomoc při přepravě vozů mezi pobočkami':'Převoz vozů/zákazníků (DPP).',
+  'Výpomoc při prodeji vozů':'Jednání s klienty, PC, střídání teplo/chlad (DPP).'
 };
 
-/* ---------- 4) helper pro select ---------- */
-const fill=(sel,arr)=>{ sel.innerHTML=''; arr.forEach(v=>sel.add(new Option(v,v))); };
-
+/* ---------- 4) naplnění selectů ---------- */
+const fill=(sel,arr)=>{sel.innerHTML='';arr.forEach(v=>sel.add(new Option(v,v)));};
 fill($('pobocka'),BRANCH);
 fill($('konzultant'),CONSULT);
 fill($('pozice_popis'),Object.keys(POS_DESC));
 
-/* ---------- 5) faktory + kategorie ---------- */
+/* faktory + kategorie */
 for(let i=1;i<=6;i++){
   const row=document.createElement('div');row.className='row';
-  const sf=document.createElement('select'); sf.id='faktor'+i; fill(sf,FACTOR);
-  const sk=document.createElement('select'); sk.id='kategorie'+i; fill(sk,CAT);
-  if(i===1){ sf.value='Vyšetření v základním rozsahu'; sk.value='Kat. 1'; }
-  row.append(sf,sk); $('factors').append(row);
+  const sf=document.createElement('select');sf.id='faktor'+i;fill(sf,FACTOR);
+  const sk=document.createElement('select');sk.id='kategorie'+i;fill(sk,CAT);
+  if(i===1){sf.value='Vyšetření v základním rozsahu';sk.value='Kat. 1';}
+  row.append(sf,sk);$('factors').append(row);
 }
 
-/* ---------- 6) drag & drop ---------- */
+/* ---------- 5) drag & drop PDF ---------- */
 const dz=$('dropZone'), fi=$('fileInput');
 dz.onclick=()=>fi.click();
 ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
 ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('drag')));
-dz.addEventListener('drop',e=>{e.preventDefault(); if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
-fi.addEventListener('change',e=>{ if(e.target.files[0])loadPDF(e.target.files[0]); });
+dz.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
+fi.addEventListener('change',e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
 
-/* ---------- 7) načtení PDF ---------- */
+/* ---------- 6) načtení PDF ---------- */
 async function loadPDF(file){
   msg('Čtu PDF…'); $('genDocx').disabled=true;
   try{
-    const data=new Uint8Array(await file.arrayBuffer());
-    const pdf=await pdfjsLib.getDocument({data}).promise;
+    const uint=new Uint8Array(await file.arrayBuffer());
+    const pdf=await pdfjsLib.getDocument({data:uint}).promise;
     const page=await pdf.getPage(1);
     const ann=await page.getAnnotations({intent:'display'});
     const get=nm=>ann.find(a=>a.fieldName?.trim().toLowerCase()===nm.toLowerCase())?.fieldValue||'';
@@ -135,25 +134,30 @@ async function loadPDF(file){
     $('narozeni').value=(get('narozeni')||'').split('/')[0].trim();
     $('adresa').value=[get('trvale-bydliste-ulice'),get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
     $('psc').value=get('trvale-bydliste-psc');
+    $('pozice').value=get('pozice')||$('pozice').value;
     msg('PDF načteno');
     $('genDocx').disabled=false;
-  }catch(e){ console.error(e); msg('Chyba při čtení PDF',true); }
+  }catch(e){console.error(e);msg('Chyba při čtení PDF',true);}
 }
 
-/* ---------- 8) načti šablonu ---------- */
+/* ---------- 7) načtení šablony ---------- */
 let templateBuf=null;
 fetch('LP_template.docx')
   .then(r=>r.ok?r.arrayBuffer():Promise.reject())
-  .then(b=>{templateBuf=b; msg('Šablona načtena');})
+  .then(b=>{templateBuf=b;msg('Šablona načtena');})
   .catch(()=>msg('Šablonu nelze načíst',true));
 
-/* ---------- 9) generování DOCX ---------- */
+/* ---------- 8) generování DOCX ---------- */
 $('genDocx').addEventListener('click',()=>{
-  if(!templateBuf){ alert('Šablona chybí'); return; }
-  try{
-    msg('Generuji…'); const zip=new PizZip(templateBuf);
-    const doc=new window.Docxtemplater(zip,{linebreaks:true});
+  if(!templateBuf){alert('Šablona chybí');return;}
 
+  msg('Generuji…');
+  try{
+    const zip=new PizZip(templateBuf);
+    const Docx=window.Docxtemplater;
+    const doc=new Docx(zip,{paragraphLoop:true,linebreaks:true});
+
+    /* data z formuláře */
     const data={
       jmeno:$('jmeno').value.trim(),
       narozeni:$('narozeni').value.trim(),
@@ -171,13 +175,18 @@ $('genDocx').addEventListener('click',()=>{
       data['kategorie'+i]=$('kategorie'+i).value;
     }
 
+    /* chybějící placeholdery → "" */
+    if(doc.compile) doc.compile();
+    const tags=doc.getTags?Object.keys(doc.getTags()):[];
+    tags.forEach(tag=>{ if(data[tag]===undefined) data[tag]=''; });
+
     doc.setData(data);
     doc.render();
 
     const out=doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-    saveAs(out,`LP_${data.jmeno.replace(/\\s+/g,'_')}.docx`);
+    saveAs(out,'LP_'+data.jmeno.replace(/\s+/g,'_')+'.docx');
     msg('Hotovo – soubor stažen');
-  }catch(err){ console.error(err); msg('Chyba generování',true); }
+  }catch(err){console.error(err);msg('Chyba generování',true);}
 });
 
 });

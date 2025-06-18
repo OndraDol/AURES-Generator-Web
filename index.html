@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <title>AURES Generátor LP</title>
+  <title>AURES Generátor LP v3</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" href="data:,">
   <style>
@@ -139,7 +139,12 @@ window.addEventListener('DOMContentLoaded', () => {
   fetch('LP_template.docx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>{tplBuf=b;msg('Šablona načtena');}).catch(()=>msg('Šablonu LP_template.docx nelze načíst',true));
 
   const esc = s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const replaceVar = (xml,key,val)=>xml.replace(new RegExp(`(<w:t[^>]*>)\\s*${key}\\s*(</w:t>)`,'g'),`$1${esc(val)}$2`);
+  const replaceVar = (xml,key,val)=>{
+    const safe = esc(val);
+    // nahraď uvnitř <w:t>... bez ohledu na velikost písmen
+    const re = new RegExp(`(<w:t[^>]*>)\s*${key}\s*(</w:t>)`,'gi');
+    return xml.replace(re, `$1${safe}$2`);
+  };
   const stripPlaceholders = xml=>xml.replace(/<w:placeholder[\s\S]*?<\/w:placeholder>/g,'').replace(/<w:placeholder[^>]*?\/>/g,'');
 
   /********************

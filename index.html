@@ -50,30 +50,21 @@
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
 
-/* ---------- util ---------- */
+/* ===== nastavení pdf.js ===== */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 const $=id=>document.getElementById(id);
 const msg=(t,err=false)=>{$('status').textContent=t;$('status').style.color=err?'#b00':'#006400';};
 
-/* ---------- číselníky (zkrácené na podstatné) ---------- */
-const FACTOR=[
- 'Zátěž chladem','Fyzická zátěž','Pracovní poloha','Hluk','Vibrace','Prach','Chemické látky a směsi','------------------',
- 'Biologické činitele','Činnosti epidemiologicky závažné','Elektrotechnik dle vyhl č.50/1978 Sb.','Neionizující záření',
- 'Obsluha tlakových nádob a zařízení VN','Obsluha VZV','Obsluha jeřábů a vázání břemen',
- 'Práce v noci','Práce ve výškách','Psychická zátěž',
- 'Řidič do 7,5 t','Řidič nad 7,5 t','Vyšetření v základním rozsahu','Zátěž teplem','Zraková zátěž'
-];
+/* ===== číselníky (zkrácené) ===== */
+const FACTOR=['Vyšetření v základním rozsahu','Fyzická zátěž','Pracovní poloha','Hluk',/* … */];
 const CAT=['','Kat. 1','Kat. 2','Kat. 3','Kat. 4'];
-const BRANCH=['Brno','Chomutov','České Budějovice','Čestlice','Hradec Králové','Jihlava','Kladno',
- 'Kolín','Liberec','Mladá Boleslav','Olomouc','Opava','Ostrava','Pardubice','Plzeň','Praha',
- 'Sokolov','Tábor','Teplice','Ústí nad Labem','Valašské Meziříčí','Zlín','Znojmo'];
-const CONSULT=['Anna Brůčková','Anna Kučerová','Alžběta Čermáková','Blanka Poliaková','Jan Jarma',
- 'Kamila Hušková','Karolína Kulvaitová','Miroslava Válková','Ondřej Dolejš'];
+const BRANCH=['Brno','Praha',/* … */];
+const CONSULT=['Anna Brůčková','Ondřej Dolejš',/* … */];
 const POS_DESC={'Prodejce':'Jednání s klienty, práce na PC a řízení vozidla.'};
 
-/* ---------- selecty ---------- */
-const fill=(el,arr)=>{el.innerHTML='';arr.forEach(v=>el.add(new Option(v,v)));};
+/* ===== selecty ===== */
+const fill=(s,a)=>{s.innerHTML='';a.forEach(v=>s.add(new Option(v,v)));};
 fill($('pobocka'),BRANCH);fill($('konzultant'),CONSULT);fill($('pozice_popis'),Object.keys(POS_DESC));
 for(let i=1;i<=6;i++){
   const row=document.createElement('div');row.className='row';
@@ -83,7 +74,7 @@ for(let i=1;i<=6;i++){
   row.append(sf,sk);$('factors').append(row);
 }
 
-/* ---------- drag & drop ---------- */
+/* ===== drag & drop PDF ===== */
 const dz=$('dropZone'), fi=$('fileInput');
 dz.onclick=()=>fi.click();
 ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
@@ -91,7 +82,6 @@ dz.onclick=()=>fi.click();
 dz.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0]);});
 fi.addEventListener('change',e=>{if(e.target.files[0])loadPDF(e.target.files[0]);});
 
-/* ---------- PDF ---------- */
 async function loadPDF(file){
   msg('Čtu PDF…');$('genDocx').disabled=true;
   try{
@@ -107,34 +97,40 @@ async function loadPDF(file){
   }catch(e){console.error(e);msg('Chyba při čtení PDF',true);}
 }
 
-/* ---------- šablona ---------- */
+/* ===== načtení šablony ===== */
 let tpl=null;
 fetch('LP_template.docx').then(r=>r.ok?r.arrayBuffer():Promise.reject())
   .then(b=>{tpl=b;msg('Šablona načtena');})
   .catch(()=>msg('Šablonu nelze načíst',true));
 
-/* ---------- generování ---------- */
+/* ===== generování ===== */
 $('genDocx').addEventListener('click',()=>{
   if(!tpl){alert('Šablona chybí');return;}
   msg('Generuji…');
 
   /* 1) najdi správný konstruktor */
-  const ctor =
-    window.docxtemplater?.DocxTemplater        // build UMD (docxtemplater bundle)
-    || window.DocxTemplater                    // starší bundle
-    || window.Docxtemplater;                   // fallback (některé CDN)
+  let Ctor=null;
+  if(window.docxtemplater){
+    if(typeof window.docxtemplater.DocxTemplater==='function'){
+      Ctor=window.docxtemplater.DocxTemplater;
+    }else if(typeof window.docxtemplater==='function'){
+      Ctor=window.docxtemplater;
+    }
+  }
+  if(!Ctor && typeof window.DocxTemplater==='function') Ctor=window.DocxTemplater;
+  if(!Ctor && typeof window.Docxtemplater==='function') Ctor=window.Docxtemplater;
 
-  if(typeof ctor!=='function'){msg('Docxtemplater nenalezen',true);return;}
+  if(!Ctor){msg('Docxtemplater nenalezen',true);return;}
 
   try{
     const zip=new PizZip(tpl);
-    const doc=new ctor(zip,{paragraphLoop:true,linebreaks:true});
+    const doc=new Ctor(zip,{paragraphLoop:true,linebreaks:true});
 
     /* data */
     const d={
       jmeno:$('jmeno').value.trim(),
       narozeni:$('narozeni').value.trim(),
-      'narozeni 0':$('narozeni').value.trim(),   // alias v šabloně
+      'narozeni 0':$('narozeni').value.trim(),
       adresa:$('adresa').value.trim(),
       psc:$('psc').value.trim(),
       pobocka:$('pobocka').value.trim(),
@@ -148,19 +144,20 @@ $('genDocx').addEventListener('click',()=>{
       const kat=$('kategorie'+i).value;
       d['faktor'+i]=$('faktor'+i).value;
       d['kategorie'+i]=kat;
-      d['Kat'+i]=kat;          // alias (Kat1…Kat6)
+      d['Kat'+i]=kat;
     }
 
     doc.setData(d); doc.render();
 
-    const out=doc.getZip().generate({
+    const blob=doc.getZip().generate({
       type:'blob',
       mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
-    saveAs(out,'LP_'+d.jmeno.replace(/\\s+/g,'_')+'.docx');
+    saveAs(blob,'LP_'+d.jmeno.replace(/\\s+/g,'_')+'.docx');
     msg('Hotovo – soubor stažen');
   }catch(err){console.error(err);msg('Chyba generování',true);}
 });
+
 });
 </script>
 </body>

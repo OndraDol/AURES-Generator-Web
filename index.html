@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
   <meta charset="utf-8">
-  <title>AURES Generátor LP v6</title>
+  <title>AURES Generátor LPv7</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" href="data:,">
   <style>
@@ -86,7 +86,7 @@ window.addEventListener('DOMContentLoaded', () => {
     "Manažer/Zástupce manažera": "Administrativní činnost, vedení týmu, jednání s klienty, řízení služebního vozu.",
     "Prodejce": "Jednání s klienty, práce na PC, střídání pobytu uvnitř/venku, řízení vozidla.",
     "Nákupčí / Testovací technik": "Jednání s klienty, práce na PC, řízení vozidla, občas venku.",
-    "Mobilní nákupčí": "Převážně řízení vozidla (>60 %), jednání s klienty, práce na PC.",
+    "Mobilní nákupčí": "Převážně řízení vozidla (>60 %), jednání s klienty, práce na PC.",
     "Specialista zákaznického servisu": "Administrativa a komunikace s klienty.",
     "Mobilní Specialista zákaznického servisu": "Administrativa, komunikace, řízení vozidla.",
     "Administrativa": "Práce na PC, zakládání složek, jednání se zaměstnanci/klienty.",
@@ -94,7 +94,7 @@ window.addEventListener('DOMContentLoaded', () => {
     "Uklízečka": "Úklidové práce, mytí, čištění, odpad.",
     "Stock kontrolor": "Převoz aut v areálu, kontrola vozového parku, PC práce.",
     "Řidič do 7,5t/ Kurýr": "Přeprava zákazníků a vozidel, řízení vozidla.",
-    "Řidič nad 7,5t": "Přeprava vozů mezi pobočkami, nakládka/vykládka, řízení vozidla >7,5 t.",
+    "Řidič nad 7,5t": "Přeprava vozů mezi pobočkami, nakládka/vykládka, řízení vozidla >7,5 t.",
     "Technik se zaměřením na opravy detailů": "Drobné opravy, řízení vozidla.",
     "Mechanik": "Údržba, opravy a seřizování vozidel, práce s chemikáliemi.",
     "Výpomoc při přepravě vozů mezi pobočkami": "Přeprava vozů/zákazníků, řízení vozidla (DPP).",
@@ -133,87 +133,4 @@ window.addEventListener('DOMContentLoaded', () => {
   fi.onchange = e => { if (e.target.files[0]) handlePDF(e.target.files[0]); };
 
   async function handlePDF(file) {
-    msg('Čtu PDF…'); $('genDocx').disabled = true;
-    try {
-      const data = new Uint8Array(await file.arrayBuffer());
-      const pdf = await pdfjsLib.getDocument({ data }).promise;
-      const page = await pdf.getPage(1);
-      const ann = await page.getAnnotations({ intent: 'display' });
-      const get = name => ann.find(a => a.fieldName?.trim() === name)?.fieldValue || '';
-      $('jmeno').value = get('jmeno');
-      $('narozeni').value = (get('narozeni') || '').split('/')[0].trim();
-      $('adresa').value = [get('trvale-bydliste-ulice'), get('trvale-bydliste-mesto')].filter(Boolean).join(', ');
-      $('psc').value = get('trvale-bydliste-psc');
-      msg('PDF načteno'); $('genDocx').disabled = false;
-    } catch (err) {
-      console.error(err); msg('Chyba při čtení PDF', true);
-    }
-  }
-
-  // ---------- 5) DOCX šablona ----------
-  let tplBuf = null;
-  fetch('LP_template.docx')
-    .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
-    .then(b => { tplBuf = b; msg('Šablona načtena'); })
-    .catch(() => msg('Šablonu LP_template.docx nelze načíst', true));
-
-  // ---------- 6) Utility pro nahrazení ----------
-  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-  const replaceVar = (xml, key, val) => {
-    const safe = esc(val);
-    // <w:t>placeholder</w:t>
-    const reRun = new RegExp(`(<w:t[^>]*>)\\s*${key}\\s*(</w:t>)`, 'gi');
-    xml = xml.replace(reRun, `$1${safe}$2`);
-    // {{placeholder}}
-    const reCurly = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
-    return xml.replace(reCurly, safe);
-  };
-
-  const stripPlaceholders = xml => xml
-    .replace(/<w:placeholder[\s\S]*?<\/w:placeholder>/g, '')
-    .replace(/<w:placeholder[^>]*?\/>/g, '');
-
-  // ---------- 7) Generování DOCX ----------
-  $('genDocx').addEventListener('click', () => {
-    if (!tplBuf) { alert('Nejdřív načti šablonu'); return; }
-
-    msg('Generuji…');
-    const zip = new PizZip(new Uint8Array(tplBuf));
-    let xml = zip.file('word/document.xml').asText();
-
-    const ctx = {
-      jmeno: $('jmeno').value,
-      narozeni: $('narozeni').value,
-      adresa: $('adresa').value,
-      psc: $('psc').value,
-      pozice: $('pozice').value,
-      konzultant: $('konzultant').value,
-      pozice_popis: $('pozice_popis').value,
-      popis_pozice: POS_DESC[$('pozice_popis').value] || '',
-      pobocka: $('pobocka').value,
-      datum: new Date().toLocaleDateString('cs-CZ')
-    };
-
-    // statické placeholdery
-    Object.entries(ctx).forEach(([k, v]) => { xml = replaceVar(xml, k, v); });
-
-    // faktory a kategorie
-    for (let i = 1; i <= 6; i++) {
-      xml = replaceVar(xml, `faktor${i}`, $('faktor' + i).value);
-      xml = replaceVar(xml, `kat${i}`, $('kategorie' + i).value);
-    }
-
-    xml = stripPlaceholders(xml);
-    zip.file('word/document.xml', xml);
-
-    const blob = zip.generate({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const surname = (ctx.jmeno.split(' ').pop() || 'posudek');
-    saveAs(blob, `LP_${surname}.docx`);
-    msg('Hotovo – soubor stažen');
-  });
-});
-</script>
-
-</body>
-</html>
+    msg('Čtu PDF…'); $('

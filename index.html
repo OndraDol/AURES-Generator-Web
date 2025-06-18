@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<title>AURES Generátor LP v10</title>
+<title>AURES Generátor LP11</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
@@ -51,7 +51,7 @@
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
 
-/* ---------- 1) pdf.js ---------- */
+/* ---------- 1) pdf.js worker ---------- */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
@@ -154,8 +154,8 @@ $('genDocx').addEventListener('click',()=>{
   msg('Generuji…');
   try{
     const zip=new PizZip(templateBuf);
-    const Docx=window.Docxtemplater;
-    const doc=new Docx(zip,{paragraphLoop:true,linebreaks:true});
+    /* Docxtemplater konstruktor – knihovna exportuje funkci na window.Docxtemplater */
+    let doc=new window.Docxtemplater().loadZip(zip);
 
     /* data z formuláře */
     const data={
@@ -175,13 +175,19 @@ $('genDocx').addEventListener('click',()=>{
       data['kategorie'+i]=$('kategorie'+i).value;
     }
 
-    /* chybějící placeholdery → "" */
-    if(doc.compile) doc.compile();
-    const tags=doc.getTags?Object.keys(doc.getTags()):[];
-    tags.forEach(tag=>{ if(data[tag]===undefined) data[tag]=''; });
-
+    /* 1. pokus o render */
     doc.setData(data);
-    doc.render();
+    try{
+      doc.render();
+    }catch(err){
+      /* pokud chybí tagy, doplníme prázdný string a zkusíme znovu */
+      if(err.properties && err.properties.errors){
+        err.properties.errors.forEach(e=>{data[e.properties.tag]='';});
+        doc=new window.Docxtemplater().loadZip(zip);
+        doc.setData(data);
+        doc.render();
+      }else throw err;
+    }
 
     const out=doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
     saveAs(out,'LP_'+data.jmeno.replace(/\s+/g,'_')+'.docx');
